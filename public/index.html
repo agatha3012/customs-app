@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>报关辅助系统 v2</title>
+<style>
+:root {
+  --primary: #1a73e8; --primary-dark: #1557b0; --success: #0d904f;
+  --danger: #d93025; --warning: #e65100; --bg: #f0f4f8;
+  --card-bg: #fff; --text: #202124; --text2: #5f6368; --border: #dadce0;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08); --radius: 12px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+.header{background:linear-gradient(135deg,#1a3a5c,#1a5276,#1a6e8e);color:#fff;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,0.15)}
+.header h1{font-size:22px;font-weight:600;display:flex;align-items:center;gap:10px}
+.header h1::before{content:'🛃';font-size:26px}
+.status{font-size:13px;opacity:.9;display:flex;align-items:center;gap:6px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#4caf50;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.container{max-width:1400px;margin:0 auto;padding:20px}
+.top-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px}
+@media(max-width:960px){.top-cards{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){.top-cards{grid-template-columns:1fr}}
+.card{background:var(--card-bg);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.card-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid #e8eaed}
+.card-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.card-icon.rate{background:#e8f5e9}.card-icon.calc{background:#e3f2fd}.card-icon.dest{background:#fff3e0}
+.card-header h2{font-size:16px;font-weight:600}
+.form-group{margin-bottom:10px}
+.form-group label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500}
+.input-row{display:flex;gap:8px;align-items:center}
+input[type="text"],input[type="number"]{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;transition:border-color .2s,box-shadow .2s;background:#fafbfc;outline:none}
+input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,115,232,0.12);background:#fff}
+input.error{border-color:var(--danger)!important;background:#fff5f5!important;box-shadow:0 0 0 3px rgba(217,48,37,0.12)!important}
+.formula-display{background:#f0f7ff;border-radius:8px;padding:10px 14px;text-align:center;font-size:14px;color:var(--primary);font-weight:500;margin-top:8px}
+.formula-display .val{font-size:20px;font-weight:700}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;white-space:nowrap}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-dark)}
+.btn-success{background:var(--success);color:#fff}.btn-success:hover{background:#0b7a3e}
+.btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{background:#b71c1c}
+.btn-outline{border:1.5px solid var(--primary);color:var(--primary);background:#fff}.btn-outline:hover{background:#e8f0fe}
+.btn-block{width:100%;justify-content:center}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-lg{padding:12px 28px;font-size:15px}
+
+.upload-section{margin-bottom:20px}
+.upload-zone{border:2px dashed #b0bec5;border-radius:var(--radius);padding:36px 20px;text-align:center;cursor:pointer;transition:all .2s;background:#fafbfc}
+.upload-zone:hover,.upload-zone.drag-over{border-color:var(--primary);background:#e8f0fe}
+.upload-zone .icon{font-size:44px;margin-bottom:8px}
+.upload-zone p{color:var(--text2);font-size:14px}
+.upload-zone .hint{font-size:12px;color:#9aa0a6;margin-top:4px}
+.upload-zone input[type="file"]{display:none}
+.upload-zone.disabled{pointer-events:none;opacity:.55}
+/* 文件预览卡片 */
+.file-preview{display:flex;align-items:center;gap:12px;background:#fff;border:1.5px solid #c8e6c9;border-radius:10px;padding:14px 18px;margin-top:12px;text-align:left}
+.file-preview-icon{font-size:36px;flex-shrink:0}
+.file-preview-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.file-preview-name{font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-preview-size{font-size:12px;color:var(--text2)}
+.file-preview-remove{width:28px;height:28px;border:1.5px solid #e0e0e0;border-radius:50%;background:#fff;color:var(--danger);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+.file-preview-remove:hover{background:#ffebee;border-color:var(--danger)}
+/* 上传进度条 */
+.upload-progress{width:100%;margin-top:14px;text-align:center}
+.progress-bar{width:100%;height:6px;background:#e0e0e0;border-radius:3px;overflow:hidden;margin-bottom:8px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--primary),#42a5f5);border-radius:3px;width:0%;transition:width .25s ease}
+.progress-text{font-size:13px;color:var(--text2)}
+
+.info-bar{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:8px;font-size:14px;margin-top:12px}
+.info-bar.ok{background:#e8f5e9;color:#2e7d32}
+.info-bar.warn{background:#fff3e0;color:#e65100}
+.info-bar.err{background:#ffebee;color:#c62828}
+
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);margin-top:12px}
+.table-wrap table{width:100%;border-collapse:collapse;font-size:13px}
+.table-wrap th,.table-wrap td{padding:8px 12px;text-align:left;border-bottom:1px solid #e8eaed;white-space:nowrap}
+.table-wrap th{background:#f8f9fa;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0}
+.table-wrap tr:hover td{background:#f5f8ff}
+.table-wrap .city-uncertain{background:#fff3e0;color:var(--warning);font-weight:500;cursor:pointer}
+.table-wrap .city-uncertain:hover{text-decoration:underline}
+.table-wrap .city-confirmed{color:var(--success)}
+.table-wrap .not-found{background:#ffebee;color:var(--danger)}
+.table-wrap .price-highlight{font-weight:700;color:var(--primary)}
+
+.actions{margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.step-indicator{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)}
+.step-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:#e8eaed;color:var(--text2)}
+.step-num.active{background:var(--primary);color:#fff}
+.step-num.done{background:var(--success);color:#fff}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;display:none}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;border-radius:var(--radius);padding:28px;max-width:520px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
+.modal h3{margin-bottom:16px;font-size:18px}
+.modal .city-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:8px 12px;background:#fff8e1;border-radius:8px}
+.modal .city-row label{font-size:13px;font-weight:500;min-width:120px}
+.modal .city-row input{flex:1}
+.modal .city-row .supplier-name{font-size:12px;color:var(--text2)}
+.modal .btn-row{margin-top:16px;display:flex;gap:8px;justify-content:flex-end}
+
+/* Toast */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:12px 28px;border-radius:8px;color:#fff;font-size:14px;z-index:99999;opacity:0;pointer-events:none;transition:opacity .35s;box-shadow:0 4px 16px rgba(0,0,0,0.25)}
+.toast.show{opacity:1}.toast.ok{background:#2e7d32}.toast.err{background:#c62828}
+/* 人工数据表单 */
+.manual-item{background:#fffbe6;border:1.5px solid #ffe082;border-radius:8px;padding:12px 14px;margin-bottom:10px}
+.manual-item.has-prev{background:#e8f5e9;border-color:#81c784}
+.manual-item-sku{font-weight:700;font-size:13px;margin-bottom:8px}
+.manual-item-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.manual-item-row label{font-size:11px;color:var(--text2);min-width:36px}
+.manual-item-row input{flex:1;min-width:80px;padding:6px 8px;font-size:12px}
+.manual-item-prev{font-size:10px;color:var(--success);margin-top:4px}
+.footer{text-align:center;padding:12px;color:#9aa0a6;font-size:11px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>报关辅助系统</h1>
+  <div class="status"><span class="status-dot"></span><span id="statusText">系统就绪</span></div>
+</div>
+
+<div class="container">
+
+  <!-- ====== 顶部三列卡片 ====== -->
+  <div class="top-cards">
+    <!-- ① 汇率 -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon rate">💱</div>
+        <h2>人民币 / 美元 汇率</h2>
+      </div>
+      <div class="form-group">
+        <label>当前汇率 (1 USD = ? CNY)</label>
+        <div class="input-row">
+          <input type="number" id="exchangeRate" step="0.0001" min="0.01" placeholder="例如 7.25">
+          <button class="btn btn-primary" onclick="saveSettings()">保存</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>单价计算公式</label>
+        <div class="formula-display">
+          单价(USD) = 进价 × <span class="val" id="displayConstant">1.25</span> ÷ <span class="val" id="displayRate">7.25</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② 常数 -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon calc">🔢</div>
+        <h2>计算常数</h2>
+      </div>
+      <div class="form-group">
+        <label>常数（默认为 1.25）</label>
+        <div class="input-row">
+          <input type="number" id="constant" step="0.01" min="0.01" placeholder="1.25">
+          <button class="btn btn-primary" onclick="saveSettings()">保存</button>
+        </div>
+      </div>
+      <div class="formula-display" style="margin-top:12px;">
+        示例：进价 ¥100 → 100×1.25÷<span id="formulaRateSample">7.25</span> = $<span id="formulaResult">17.24</span>
+      </div>
+    </div>
+
+    <!-- ③ 目的地 -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon dest">📍</div>
+        <h2>最终目的地（国家）</h2>
+      </div>
+      <div class="form-group">
+        <label>目的地国家</label>
+        <div class="input-row">
+          <input type="text" id="destination" placeholder="例如：德国">
+          <button class="btn btn-primary" onclick="saveSettings()">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 数据库更新卡片 ====== -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header">
+      <div class="card-icon" style="background:#ede7f6;">🗄️</div>
+      <h2>产品数据库</h2>
+      <span id="dbStatus" style="margin-left:auto;font-size:12px;color:var(--text2)">加载中...</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <div class="db-stats" id="dbStats" style="font-size:13px;color:var(--text2);line-height:1.8">
+          未加载
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-outline" id="btnUploadDB" onclick="document.getElementById('dbFileInput').click()">
+          📤 上传备货单
+        </button>
+        <input type="file" id="dbFileInput" accept=".xlsx,.xls" onchange="handleDBUpload(event)" style="display:none">
+      </div>
+    </div>
+    <div id="dbUploadInfo" class="info-bar" style="display:none;margin-top:10px"></div>
+  </div>
+
+  <!-- ====== ④ 上传 + 表格 + 生成 ====== -->
+  <div class="card upload-section">
+    <div class="card-header">
+      <div class="card-icon" style="background:#f3e5f5;">📊</div>
+      <h2>发票上传 &amp; 产品查询 &amp; 生成报关文件</h2>
+      <div class="step-indicator" style="margin-left:auto">
+        <span class="step-num" id="step1">1</span> 上传
+        <span style="color:#ccc">→</span>
+        <span class="step-num" id="step2">2</span> 查询
+        <span style="color:#ccc">→</span>
+        <span class="step-num" id="step3">3</span> 确认
+        <span style="color:#ccc">→</span>
+        <span class="step-num" id="step4">4</span> 生成
+      </div>
+    </div>
+
+    <!-- 上传区域 -->
+    <div class="upload-zone" id="uploadZone" onclick="triggerUpload()">
+      <div class="icon" id="uploadIcon">📁</div>
+      <p id="uploadText">拖拽报关发票 Excel 到此处，或 <strong>点击选择</strong></p>
+      <p class="hint" id="uploadHint">支持 .xlsx / .xls（CIPI 工作表格式）</p>
+      <div class="file-preview" id="filePreview" style="display:none">
+        <div class="file-preview-icon">📄</div>
+        <div class="file-preview-info">
+          <span class="file-preview-name" id="fileNameDisplay"></span>
+          <span class="file-preview-size" id="fileSizeDisplay"></span>
+        </div>
+        <button class="file-preview-remove" onclick="event.stopPropagation();removeFile()" title="移除文件">✕</button>
+      </div>
+      <div class="upload-progress" id="uploadProgress" style="display:none">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <span class="progress-text" id="progressText">上传中...</span>
+      </div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(event)">
+    </div>
+
+    <!-- 状态栏 -->
+    <div id="infoBar" class="info-bar" style="display:none"></div>
+
+    <!-- 产品表格 -->
+    <div class="table-wrap" id="tableWrap" style="display:none">
+      <table id="productTable">
+        <thead>
+          <tr>
+            <th>SKU</th><th>中文品名</th><th>单位</th><th>总数量</th>
+            <th>最高进价(¥)</th><th>供应商</th><th>境内货源地</th>
+            <th>单价(USD)</th><th>总价(USD)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="actions" id="actionsRow" style="display:none">
+      <button class="btn btn-success btn-lg" id="btnGenerate" onclick="generateFile()">
+        ⬇ 生成并下载报关文件
+      </button>
+      <button class="btn btn-outline" id="btnReupload" onclick="resetAll()">
+        🔄 重新上传
+      </button>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<div class="footer">报关辅助系统 v2.0 &copy; 2026</div>
+
+<!-- 货源地确认弹窗 -->
+<div class="modal-overlay" id="locationModal">
+  <div class="modal">
+    <h3>🚨 确认境内货源地</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">
+      以下产品的供应商位置无法自动确定，请确认或手动修正（精确到城市）：
+    </p>
+    <div id="locationList"></div>
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="closeLocationModal()">取消</button>
+      <button class="btn btn-success" onclick="confirmLocations()">确认并继续</button>
+    </div>
+  </div>
+</div>
+
+<!-- 人工补充数据弹窗 -->
+<div class="modal-overlay" id="manualDataModal">
+  <div class="modal" style="max-width:640px">
+    <h3>📝 补充产品数据</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:10px">
+      以下产品在数据库中<strong>未找到</strong>，请手动填写进价和货源地等信息：
+    </p>
+    <div id="manualPrevInfo" style="display:none;font-size:12px;background:#e8f5e9;padding:8px 12px;border-radius:6px;margin-bottom:12px;color:#2e7d32">
+      💡 部分 SKU 有之前保存的数据，已自动填充，请确认。
+    </div>
+    <div id="manualDataList" style="max-height:360px;overflow-y:auto"></div>
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="closeManualDataModal()">跳过</button>
+      <button class="btn btn-success" onclick="saveManualData()">💾 保存并继续</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ==================== 全局状态 ====================
+const STATE = {
+  exchangeRate: 7.25,
+  constant: 1.25,
+  destination: '',
+  invoiceProducts: [],    // 发票解析的汇总产品
+  invoiceBoxes: [],       // 发票箱级数据
+  lookupResult: null,     // 数据库查询结果
+  confirmedLocations: {}, // 用户确认的货源地
+};
+
+// ==================== 工具 ====================
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + (type||'') + ' show';
+  clearTimeout(t._tid); t._tid = setTimeout(() => t.className='toast', 3000);
+}
+async function api(method, url, body) {
+  const opts = { method, headers: body ? {'Content-Type':'application/json'} : {} };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || '请求失败');
+  return data;
+}
+
+// ==================== 初始化 ====================
+async function init() {
+  try {
+    const s = await api('GET', '/api/settings');
+    STATE.exchangeRate = s.exchangeRate || 7.25;
+    STATE.constant = s.constant || 1.25;
+    STATE.destination = s.destination || '';
+    document.getElementById('exchangeRate').value = STATE.exchangeRate;
+    document.getElementById('constant').value = STATE.constant;
+    document.getElementById('destination').value = STATE.destination;
+    updateFormulaDisplay();
+  } catch(e) { console.error('Init error:', e); }
+  refreshDBStatus();
+}
+
+/** 刷新数据库状态显示 */
+async function refreshDBStatus() {
+  try {
+    const s = await api('GET', '/api/product-db-status');
+    const el = document.getElementById('dbStats');
+    const badge = document.getElementById('dbStatus');
+    const lastMerge = s.lastMerge
+      ? new Date(s.lastMerge).toLocaleString('zh-CN')
+      : '从未更新';
+    el.innerHTML =
+      '<strong>' + s.totalSKUs + '</strong> 个 SKU，' +
+      '<strong>' + s.totalRecords + '</strong> 条记录<br>' +
+      '<span style="font-size:11px">最近更新: ' + lastMerge + '</span>';
+    badge.textContent = s.totalSKUs > 0 ? '✅ ' + s.totalSKUs + ' SKU' : '⚠ 未加载数据';
+    badge.style.color = s.totalSKUs > 0 ? 'var(--success)' : 'var(--warning)';
+  } catch(e) {
+    document.getElementById('dbStats').textContent = '无法获取状态';
+    document.getElementById('dbStatus').textContent = '❌ 离线';
+  }
+}
+
+/** 上传备货单并合并到数据库 */
+async function handleDBUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const btn = document.getElementById('btnUploadDB');
+  const info = document.getElementById('dbUploadInfo');
+  btn.disabled = true;
+  btn.textContent = '⏳ 上传中...';
+  info.style.display = 'flex';
+  info.className = 'info-bar warn';
+  info.innerHTML = '⏳ 正在上传并合并: <strong>' + file.name + '</strong>...';
+
+  const fd = new FormData(); fd.append('file', file);
+  try {
+    const res = await fetch('/api/upload-product-db', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message);
+
+    info.className = 'info-bar ok';
+    info.innerHTML = '✅ <strong>' + file.name + '</strong> 合并完成 — ' +
+      data.newAdded + ' 个新增, ' + data.updated + ' 个更新, ' +
+      data.kept + ' 个保留 → 共 <strong>' + data.totalSKUs + '</strong> SKU';
+
+    refreshDBStatus();
+    // 如果已有发票数据，自动重新查询
+    if (STATE.invoiceProducts.length > 0) {
+      await lookupProducts();
+    }
+  } catch(e) {
+    info.className = 'info-bar err';
+    info.innerHTML = '❌ 上传失败: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📤 上传备货单';
+    document.getElementById('dbFileInput').value = '';
+  }
+}
+
+function updateFormulaDisplay() {
+  document.getElementById('displayRate').textContent = STATE.exchangeRate;
+  document.getElementById('displayConstant').textContent = STATE.constant;
+  document.getElementById('formulaRateSample').textContent = STATE.exchangeRate;
+  const result = (100 * STATE.constant / STATE.exchangeRate).toFixed(2);
+  document.getElementById('formulaResult').textContent = result;
+}
+
+// ==================== 设置保存 ====================
+async function saveSettings() {
+  const rateEl = document.getElementById('exchangeRate');
+  const constEl = document.getElementById('constant');
+  const destEl = document.getElementById('destination');
+
+  // 清除错误标记
+  [rateEl, constEl, destEl].forEach(el => el.classList.remove('error'));
+
+  const rate = parseFloat(rateEl.value);
+  const constant = parseFloat(constEl.value);
+  const dest = destEl.value.trim();
+
+  if (isNaN(rate) || rate <= 0) { rateEl.classList.add('error'); showToast('请输入有效的汇率', 'err'); return; }
+  if (isNaN(constant) || constant <= 0) { constEl.classList.add('error'); showToast('请输入有效的常数', 'err'); return; }
+
+  try {
+    const r = await api('POST', '/api/settings', { exchangeRate: rate, constant, destination: dest });
+    STATE.exchangeRate = r.data.exchangeRate;
+    STATE.constant = r.data.constant;
+    STATE.destination = r.data.destination;
+    updateFormulaDisplay();
+    showToast('设置已保存', 'ok');
+  } catch(e) { showToast(e.message, 'err'); }
+}
+
+// ==================== 文件上传 ====================
+let _uploading = false;  // 防止重复提交
+
+function triggerUpload() {
+  if (_uploading) return;
+  document.getElementById('fileInput').click();
+}
+
+['dragenter','dragover'].forEach(e => {
+  uploadZone.addEventListener(e, ev => { ev.preventDefault(); if(!_uploading) uploadZone.classList.add('drag-over'); });
+});
+['dragleave','drop'].forEach(e => {
+  uploadZone.addEventListener(e, ev => { ev.preventDefault(); uploadZone.classList.remove('drag-over'); });
+});
+uploadZone.addEventListener('drop', e => {
+  if (_uploading) return;
+  const f = e.dataTransfer.files[0]; if (f) selectFile(f);
+});
+
+function handleFile(e) { const f = e.target.files[0]; if (f) selectFile(f); }
+
+/** 文件选中后的校验 + 预览，不直接上传 */
+function selectFile(file) {
+  // 校验类型
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext !== 'xlsx' && ext !== 'xls') {
+    showToast('仅支持 .xlsx / .xls 格式文件', 'err');
+    return;
+  }
+  // 校验大小 (< 50MB)
+  if (file.size > 50 * 1024 * 1024) {
+    showToast('文件大小不能超过 50MB', 'err');
+    return;
+  }
+
+  // 显示文件预览
+  document.getElementById('fileNameDisplay').textContent = file.name;
+  document.getElementById('fileSizeDisplay').textContent = formatSize(file.size);
+  document.getElementById('filePreview').style.display = 'flex';
+  document.getElementById('uploadIcon').style.display = 'none';
+  document.getElementById('uploadText').style.display = 'none';
+  document.getElementById('uploadHint').style.display = 'none';
+
+  uploadFile(file);
+}
+
+/** 格式化文件大小 */
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(2) + ' MB';
+}
+
+/** 移除已选文件 */
+function removeFile() {
+  document.getElementById('fileInput').value = '';
+  document.getElementById('filePreview').style.display = 'none';
+  document.getElementById('uploadIcon').style.display = '';
+  document.getElementById('uploadText').style.display = '';
+  document.getElementById('uploadHint').style.display = '';
+}
+
+async function uploadFile(file) {
+  _uploading = true;
+  updateSteps(0);
+  uploadZone.classList.add('disabled');
+
+  // 显示进度条
+  const progDiv = document.getElementById('uploadProgress');
+  const progFill = document.getElementById('progressFill');
+  const progText = document.getElementById('progressText');
+  progDiv.style.display = 'block';
+  progFill.style.width = '0%';
+  progText.textContent = '上传中...';
+  // 模拟进度动画
+  let simWidth = 0;
+  const simTimer = setInterval(() => {
+    simWidth = Math.min(simWidth + Math.random() * 15, 85);
+    progFill.style.width = simWidth + '%';
+  }, 200);
+
+  const info = document.getElementById('infoBar');
+  info.style.display = 'flex'; info.className = 'info-bar warn';
+  info.innerHTML = '⏳ 正在上传并解析文件: <strong>' + file.name + '</strong>...';
+
+  const fd = new FormData(); fd.append('file', file);
+  try {
+    const res = await fetch('/api/upload-invoice', { method: 'POST', body: fd });
+    clearInterval(simTimer);
+    progFill.style.width = '100%';
+    progText.textContent = '解析完成';
+
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message);
+
+    STATE.invoiceProducts = data.products;
+    STATE.invoiceBoxes = data.boxes;
+    STATE.lookupResult = null;
+    STATE.confirmedLocations = {};
+
+    info.className = 'info-bar ok';
+    info.innerHTML = '✅ <strong>' + file.name + '</strong> 解析成功 — ' +
+      data.totalBoxes + ' 箱, ' + data.products.length + ' 种产品';
+    updateSteps(1);
+
+    // 自动查询产品数据库
+    await lookupProducts();
+  } catch(e) {
+    clearInterval(simTimer);
+    progFill.style.width = '100%';
+    progFill.style.background = 'var(--danger)';
+    progText.textContent = '失败';
+    info.className = 'info-bar err';
+    info.innerHTML = '❌ 上传失败: ' + e.message;
+    // 失败后恢复可重试
+    _uploading = false;
+    uploadZone.classList.remove('disabled');
+  } finally {
+    setTimeout(() => {
+      progDiv.style.display = 'none';
+      progFill.style.width = '0%';
+      progFill.style.background = '';
+    }, 1500);
+    _uploading = false;
+    uploadZone.classList.remove('disabled');
+  }
+}
+
+// ==================== 产品查询 ====================
+async function lookupProducts() {
+  if (!STATE.invoiceProducts.length) return;
+  updateSteps(1);
+  const info = document.getElementById('infoBar');
+  info.className = 'info-bar warn';
+  info.innerHTML = '🔍 正在从产品数据库中查询进价...';
+
+  const skus = STATE.invoiceProducts.map(p => p.sku);
+  try {
+    const data = await api('POST', '/api/lookup-products', { skus });
+    STATE.lookupResult = data;
+
+    // 检查是否有不确定的城市
+    const uncertain = [];
+    Object.values(data.found).forEach(item => {
+      if (item.cityUncertain) uncertain.push(item);
+    });
+
+    if (data.notFound.length > 0) {
+      info.className = 'info-bar warn';
+      info.innerHTML = '⚠️ ' + data.notFound.length + ' 个SKU在数据库中未找到: ' + data.notFound.join(', ');
+    } else {
+      info.className = 'info-bar ok';
+      info.innerHTML = '✅ 产品查询完成 — ' + Object.keys(data.found).length + ' 个SKU已匹配';
+    }
+
+    renderProductTable();
+    updateSteps(2);
+
+    // 处理流程: 1)人工数据弹窗 → 2)货源地弹窗
+    if (data.notFound.length > 0) {
+      showManualDataModal(data.notFound);
+    } else if (uncertain.length > 0) {
+      showLocationModal(uncertain);
+    } else {
+      updateSteps(3);
+      Object.values(data.found).forEach(item => {
+        STATE.confirmedLocations[item.sku] = item.city;
+      });
+    }
+  } catch(e) {
+    info.className = 'info-bar err';
+    info.innerHTML = '❌ ' + e.message;
+  }
+}
+
+// ==================== 人工补充数据弹窗 ====================
+async function showManualDataModal(notFoundSkus) {
+  // 预加载已保存的人工数据
+  let prevData = {};
+  let hasPrev = false;
+  try {
+    prevData = await api('GET', '/api/manual-data');
+  } catch(e) { /* ignore */ }
+
+  const list = document.getElementById('manualDataList');
+  const prevInfo = document.getElementById('manualPrevInfo');
+  let hasAnyPrev = false;
+
+  const invoiceProducts = STATE.invoiceProducts;
+  const skuMap = {};
+  invoiceProducts.forEach(p => { skuMap[p.sku] = p; });
+
+  list.innerHTML = notFoundSkus.map(sku => {
+    const prod = skuMap[sku] || {};
+    const prev = prevData[sku];
+    const hasData = !!prev;
+    if (hasData) hasAnyPrev = true;
+
+    return '<div class="manual-item' + (hasData ? ' has-prev' : '') + '">'
+      + '<div class="manual-item-sku">' + sku + ' — ' + (prod.nameCN || '') + '（总数量: ' + (prod.totalQty || '?') + '）</div>'
+      + '<div class="manual-item-row">'
+        + '<label>进价¥</label><input type="number" class="m-price" data-sku="' + sku + '" step="0.01" placeholder="最高进价(人民币)" value="' + (hasData ? prev.maxPrice : '') + '">'
+        + '<label>单净重</label><input type="number" class="m-netw" data-sku="' + sku + '" step="0.001" placeholder="kg/件" value="' + (hasData ? prev.netWeightPerUnit : '0.5') + '">'
+        + '<label>单位</label><input type="text" class="m-unit" data-sku="' + sku + '" style="max-width:50px" value="' + (prod.unit || '个') + '">'
+      + '</div>'
+      + '<div class="manual-item-row">'
+        + '<label>供应商</label><input type="text" class="m-supplier" data-sku="' + sku + '" placeholder="供应商名称" value="' + (hasData ? prev.supplier : '') + '">'
+        + '<label>货源地</label><input type="text" class="m-city" data-sku="' + sku + '" placeholder="城市" value="' + (hasData ? prev.city : '') + '" style="max-width:120px">'
+      + '</div>'
+      + (hasData ? '<div class="manual-item-prev">📌 上次保存: ' + prev.supplier + ' ¥' + prev.maxPrice + ' | ' + (prev.city || '未填城市') + '</div>' : '')
+      + '</div>';
+  }).join('');
+
+  prevInfo.style.display = hasAnyPrev ? 'block' : 'none';
+  document.getElementById('manualDataModal').classList.add('show');
+}
+
+function closeManualDataModal() {
+  document.getElementById('manualDataModal').classList.remove('show');
+}
+
+async function saveManualData() {
+  const entries = {};
+  document.querySelectorAll('.manual-item').forEach(item => {
+    const sku = item.querySelector('.m-price').dataset.sku;
+    const price = parseFloat(item.querySelector('.m-price').value) || 0;
+    const netw = parseFloat(item.querySelector('.m-netw').value) || 0.5;
+    const supplier = item.querySelector('.m-supplier').value.trim();
+    const city = item.querySelector('.m-city').value.trim();
+    if (price > 0 || supplier) {
+      entries[sku] = { maxPrice: price, supplier, city, netWeightPerUnit: netw };
+    }
+  });
+
+  if (Object.keys(entries).length === 0) {
+    showToast('请至少填写一个产品的进价或供应商', 'err');
+    return;
+  }
+
+  try {
+    await api('POST', '/api/manual-data', entries);
+    showToast('✅ 已保存 ' + Object.keys(entries).length + ' 个产品数据', 'ok');
+    closeManualDataModal();
+
+    // 重新查询以使用刚保存的数据
+    await lookupProducts();
+  } catch(e) {
+    showToast('保存失败: ' + e.message, 'err');
+  }
+}
+
+// ==================== 渲染产品表格 ====================
+function renderProductTable() {
+  const wrap = document.getElementById('tableWrap');
+  const tbody = document.querySelector('#productTable tbody');
+  const actions = document.getElementById('actionsRow');
+  wrap.style.display = 'block';
+  actions.style.display = 'flex';
+
+  const data = STATE.lookupResult;
+  if (!data) return;
+
+  tbody.innerHTML = '';
+  STATE.invoiceProducts.forEach(prod => {
+    const found = data.found[prod.sku];
+    const tr = document.createElement('tr');
+
+    if (!found) {
+      tr.innerHTML = `<td>${prod.sku}</td><td>${prod.nameCN}</td><td>${prod.unit}</td>
+        <td>${prod.totalQty}</td><td class="not-found" colspan="5">❌ 未在数据库中找到</td>`;
+      tbody.appendChild(tr);
+      return;
+    }
+
+    const totalUSD = (found.unitPriceUSD * prod.totalQty).toFixed(2);
+    const cityCell = found.cityUncertain
+      ? `<td class="city-uncertain" onclick="editLocation('${prod.sku}','${found.rawSupplier||found.supplier}')" title="点击修改货源地">
+           ⚠️ ${found.city || '未确定'} <span style="font-size:10px">(点击确认)</span></td>`
+      : `<td class="city-confirmed">${found.city || ''}</td>`;
+
+    tr.innerHTML = `
+      <td><strong>${prod.sku}</strong></td>
+      <td>${prod.nameCN}</td><td>${prod.unit}</td><td>${prod.totalQty}</td>
+      <td class="price-highlight">¥${found.maxPrice.toFixed(2)}</td>
+      <td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis">${found.supplier}</td>
+      ${cityCell}
+      <td class="price-highlight">$${found.unitPriceUSD.toFixed(5)}</td>
+      <td>$${totalUSD}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ==================== 货源地弹窗 ====================
+function showLocationModal(uncertainItems) {
+  const list = document.getElementById('locationList');
+  list.innerHTML = uncertainItems.map(item => `
+    <div class="city-row">
+      <label>${item.sku}</label>
+      <div style="flex:1">
+        <input type="text" class="location-input" data-sku="${item.sku}"
+               value="${item.city||''}" placeholder="请输入城市名">
+        <div class="supplier-name">供应商: ${item.rawSupplier||item.supplier||'未知'}</div>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('locationModal').classList.add('show');
+}
+
+function closeLocationModal() {
+  document.getElementById('locationModal').classList.remove('show');
+}
+
+function editLocation(sku, supplier) {
+  // 单个编辑
+  const item = STATE.lookupResult.found[sku];
+  showLocationModal([item]);
+}
+
+function confirmLocations() {
+  document.querySelectorAll('.location-input').forEach(input => {
+    const sku = input.dataset.sku;
+    const city = input.value.trim();
+    if (city) {
+      STATE.confirmedLocations[sku] = city;
+      // 更新状态（不再uncertain）
+      if (STATE.lookupResult && STATE.lookupResult.found[sku]) {
+        STATE.lookupResult.found[sku].city = city;
+        STATE.lookupResult.found[sku].cityUncertain = false;
+      }
+    }
+  });
+  closeLocationModal();
+  renderProductTable();
+  updateSteps(3);
+  showToast('货源地已确认，可以生成文件', 'ok');
+}
+
+// ==================== 生成文件 ====================
+async function generateFile() {
+  // 验证必填项
+  const rateEl = document.getElementById('exchangeRate');
+  const constEl = document.getElementById('constant');
+  const destEl = document.getElementById('destination');
+  [rateEl, constEl, destEl].forEach(el => el.classList.remove('error'));
+
+  let hasError = false;
+  const rate = parseFloat(rateEl.value);
+  const constant = parseFloat(constEl.value);
+  const dest = destEl.value.trim();
+
+  if (isNaN(rate) || rate <= 0) { rateEl.classList.add('error'); hasError = true; }
+  if (isNaN(constant) || constant <= 0) { constEl.classList.add('error'); hasError = true; }
+  if (!dest) { destEl.classList.add('error'); hasError = true; }
+
+  if (hasError) {
+    showToast('请填写所有必填项（红色标记）', 'err');
+    return;
+  }
+
+  // 检查是否有未确认的货源地
+  if (STATE.lookupResult) {
+    const uncertain = Object.values(STATE.lookupResult.found).filter(f => f.cityUncertain);
+    if (uncertain.length > 0) {
+      showToast('请先确认 ' + uncertain.length + ' 个产品的境内货源地', 'err');
+      showLocationModal(uncertain);
+      return;
+    }
+  }
+
+  // 先保存设置
+  await saveSettingsSilent();
+
+  const btn = document.getElementById('btnGenerate');
+  btn.disabled = true;
+  btn.textContent = '⏳ 正在生成...';
+
+  try {
+    const data = await api('POST', '/api/generate', {
+      confirmedLocations: STATE.confirmedLocations,
+    });
+
+    // 触发下载
+    window.open(data.downloadUrl, '_blank');
+    showToast('✅ 报关文件已生成并开始下载: ' + data.fileName, 'ok');
+    updateSteps(4);
+  } catch(e) {
+    showToast('生成失败: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⬇ 生成并下载报关文件';
+  }
+}
+
+async function saveSettingsSilent() {
+  const rate = parseFloat(document.getElementById('exchangeRate').value) || STATE.exchangeRate;
+  const constant = parseFloat(document.getElementById('constant').value) || STATE.constant;
+  const dest = document.getElementById('destination').value.trim();
+  try {
+    const r = await api('POST', '/api/settings', { exchangeRate: rate, constant, destination: dest });
+    STATE.exchangeRate = r.data.exchangeRate;
+    STATE.constant = r.data.constant;
+    STATE.destination = r.data.destination;
+  } catch(e) { /* silent */ }
+}
+
+// ==================== 步骤指示器 ====================
+function updateSteps(step) {
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById('step'+i);
+    el.classList.remove('active', 'done');
+    if (i < step) el.classList.add('done');
+    else if (i === step) el.classList.add('active');
+  }
+}
+
+function resetAll() {
+  STATE.invoiceProducts = [];
+  STATE.invoiceBoxes = [];
+  STATE.lookupResult = null;
+  STATE.confirmedLocations = {};
+  _uploading = false;
+  uploadZone.classList.remove('disabled');
+  document.getElementById('infoBar').style.display = 'none';
+  document.getElementById('tableWrap').style.display = 'none';
+  document.getElementById('actionsRow').style.display = 'none';
+  document.querySelector('#productTable tbody').innerHTML = '';
+  document.getElementById('fileInput').value = '';
+  // 恢复上传区域默认状态
+  document.getElementById('filePreview').style.display = 'none';
+  document.getElementById('uploadProgress').style.display = 'none';
+  document.getElementById('uploadIcon').style.display = '';
+  document.getElementById('uploadText').style.display = '';
+  document.getElementById('uploadHint').style.display = '';
+  updateSteps(0);
+}
+
+// ==================== 启动 ====================
+init();
+</script>
+</body>
+</html>

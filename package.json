@@ -1,0 +1,14 @@
+{
+  "name": "customs-app",
+  "version": "1.0.0",
+  "description": "报关辅助系统",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "multer": "^1.4.5-lts.1",
+    "xlsx": "^0.18.5"
+  }
+}

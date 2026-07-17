@@ -1,0 +1,20 @@
+{
+  "FD-509-C2KG": {
+    "sku": "FD-509-C2KG",
+    "maxPrice": 40,
+    "supplier": "",
+    "city": "",
+    "netWeightPerUnit": 2,
+    "description": "",
+    "updatedAt": "2026-07-17T09:24:28.404Z"
+  },
+  "FD-504-682": {
+    "sku": "FD-504-682",
+    "maxPrice": 11.45,
+    "supplier": "",
+    "city": "",
+    "netWeightPerUnit": 1,
+    "description": "",
+    "updatedAt": "2026-07-17T09:24:28.404Z"
+  }
+}
