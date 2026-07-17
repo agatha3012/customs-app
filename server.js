@@ -748,6 +748,42 @@ app.post('/api/save-confirmations', (req, res) => {
   }
 });
 
+// ==================== 智能净重推断 ====================
+/**
+ * 获取单件产品净重 (kg)，按优先级：
+ * 1. 人工补充数据 (manual_data.json)
+ * 2. 产品描述中的重量（如 "1KG"、"170g"）
+ * 3. SKU 名称中的重量（如 "C2KG" → 2kg, "C1KG" → 1kg）
+ * 4. 默认 0.5kg
+ */
+function getNetWeightPerUnit(sku, description) {
+  const manualData = readManualData();
+  // 1. 人工数据
+  if (manualData[sku] && manualData[sku].netWeightPerUnit > 0) {
+    return manualData[sku].netWeightPerUnit;
+  }
+
+  // 2. 产品描述中的重量
+  if (description) {
+    const m = description.match(/(\d+\.?\d*)\s*(KG|kg|Kg|g|G)/);
+    if (m) {
+      let w = parseFloat(m[1]);
+      if (m[2] === 'g' || m[2] === 'G') w /= 1000;
+      if (w > 0) return w;
+    }
+  }
+
+  // 3. SKU 名称中的重量 (如 C2KG→2, C1KG→1)
+  const skuMatch = sku.match(/C?(\d+)\s*KG/i);
+  if (skuMatch) {
+    const w = parseFloat(skuMatch[1]);
+    if (w > 0 && w < 500) return w;
+  }
+
+  // 4. 默认
+  return 0.5;
+}
+
 // ==================== 生成报关文件 ====================
 app.post('/api/generate', async (req, res) => {
   try {
@@ -819,9 +855,8 @@ app.post('/api/generate', async (req, res) => {
         domesticSource = found.city;
       }
 
-      // 从人工补充数据获取单件净重（否则用默认0.5）
-      const manualNetW = manualData[invProd.sku] ? manualData[invProd.sku].netWeightPerUnit : null;
-      const netWPerUnit = (manualNetW !== null && manualNetW > 0) ? manualNetW : 0.5;
+      // 从多来源智能推断单件净重
+      const netWPerUnit = getNetWeightPerUnit(invProd.sku, found ? found.description : '');
       const calcNetWeight = invProd.totalQty * netWPerUnit;
 
       return {
@@ -864,8 +899,7 @@ app.post('/api/generate', async (req, res) => {
           domesticSource = found.city;
         }
 
-        const bManualNetW = manualData[bp.sku] ? manualData[bp.sku].netWeightPerUnit : null;
-        const bNetWPerUnit = (bManualNetW !== null && bManualNetW > 0) ? bManualNetW : 0.5;
+        const bNetWPerUnit = getNetWeightPerUnit(bp.sku, found ? found.description : '');
 
         return {
           sku: bp.sku,
