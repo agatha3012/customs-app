@@ -15,6 +15,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json');
 const MANUAL_DATA_FILE = path.join(__dirname, 'data', 'manual_product_data.json');
+const CONFIRMATIONS_FILE = path.join(__dirname, 'data', 'confirmations.json');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const OUTPUT_DIR = path.join(__dirname, 'output');
 const TEMPLATE_PATH = path.join(__dirname, 'templates', '报关资料模板(7.9).xlsx');
@@ -599,8 +600,188 @@ app.post('/api/reload-db', (req, res) => {
   }
 });
 
+// ==================== 确认数据持久化 ====================
+function readConfirmations() {
+  try {
+    if (!fs.existsSync(CONFIRMATIONS_FILE)) return {};
+    return JSON.parse(fs.readFileSync(CONFIRMATIONS_FILE, 'utf-8'));
+  } catch (e) { return {}; }
+}
+function writeConfirmations(data) {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(CONFIRMATIONS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+// ==================== 生成前数据核验 ====================
+app.post('/api/preflight-check', (req, res) => {
+  try {
+    const { skus } = req.body;
+    if (!skus || !Array.isArray(skus) || skus.length === 0) {
+      return res.status(400).json({ success: false, message: '请提供SKU列表' });
+    }
+
+    const settings = readSettings();
+    const exchangeRate = settings.exchangeRate || 7.25;
+    const constant = settings.constant || 1.25;
+
+    // 查询产品数据库
+    const lookupResult = productLookup.lookupProducts(skus);
+
+    // 人工补充数据
+    const manualData = readManualData();
+    lookupResult.notFound.forEach(sku => {
+      if (manualData[sku]) {
+        const md = manualData[sku];
+        lookupResult.found[sku] = {
+          sku, maxPrice: md.maxPrice, allPrices: [md.maxPrice],
+          supplier: md.supplier || '', description: md.description || '',
+          recordCount: 1, city: md.city || '', cityUncertain: false,
+          rawSupplier: md.supplier || '', source: 'manual',
+        };
+      }
+    });
+
+    // 历史确认数据
+    const confirmations = readConfirmations();
+
+    // 读取发票数据
+    const sessionFile = path.join(UPLOADS_DIR, 'last_parsed.json');
+    const invoiceData = fs.existsSync(sessionFile)
+      ? JSON.parse(fs.readFileSync(sessionFile, 'utf-8'))
+      : { products: [] };
+
+    // 构建SKU→中文名映射
+    const skuNames = {};
+    (invoiceData.products || []).forEach(p => { skuNames[p.sku] = p.nameCN; });
+
+    const uncertainItems = [];
+
+    skus.forEach(sku => {
+      const found = lookupResult.found[sku];
+      const nameCN = skuNames[sku] || sku;
+      const saved = confirmations[sku] || null;
+
+      // 情况1：数据库和人工数据都找不到 → 需要补全进价+供应商+货源地
+      if (!found) {
+        uncertainItems.push({
+          sku, nameCN,
+          field: 'all',
+          label: '全部信息（进价/供应商/货源地）',
+          currentValue: '',
+          savedValue: saved ? JSON.stringify({ supplier: saved.supplier, domesticSource: saved.domesticSource, maxPrice: saved.maxPrice }) : '',
+          savedData: saved,
+          reason: '产品数据库中未找到此SKU',
+          supplier: '',
+        });
+        return;
+      }
+
+      // 情况2：进价为0
+      if (!found.maxPrice || found.maxPrice <= 0) {
+        uncertainItems.push({
+          sku, nameCN,
+          field: 'maxPrice',
+          label: '最高进价(¥)',
+          currentValue: '',
+          savedValue: saved ? String(saved.maxPrice || '') : '',
+          savedData: saved,
+          reason: '未找到有效进价记录',
+          supplier: found.supplier || '',
+        });
+      }
+
+      // 情况3：境内货源地缺失或不明确
+      const cityMissing = !found.city || found.city === '';
+      const cityUncertain = found.cityUncertain === true;
+      if (cityMissing || cityUncertain) {
+        uncertainItems.push({
+          sku, nameCN,
+          field: 'domesticSource',
+          label: '境内货源地',
+          currentValue: found.city || '',
+          savedValue: saved ? String(saved.domesticSource || '') : '',
+          savedData: saved,
+          reason: cityMissing ? '供应商信息缺失，无法推断货源地' : '货源地不确定（供应商: ' + (found.rawSupplier || found.supplier) + '）',
+          supplier: found.supplier || found.rawSupplier || '',
+        });
+      }
+
+      // 情况4：供应商为空
+      if (!found.supplier || found.supplier === '') {
+        // 如果已经因为货源地缺失加了，就合并到同一条
+        const alreadyListed = uncertainItems.find(
+          it => it.sku === sku && it.field === 'domesticSource'
+        );
+        if (alreadyListed) {
+          alreadyListed.alsoMissingSupplier = true;
+        } else {
+          uncertainItems.push({
+            sku, nameCN,
+            field: 'supplier',
+            label: '供应商',
+            currentValue: '',
+            savedValue: saved ? String(saved.supplier || '') : '',
+            savedData: saved,
+            reason: '供应商信息缺失',
+            supplier: '',
+          });
+        }
+      }
+
+      // 记录当前计算值供前端展示
+      if (found.maxPrice > 0) {
+        const unitPriceUSD = (found.maxPrice * constant) / exchangeRate;
+        uncertainItems.forEach(it => {
+          if (it.sku === sku) {
+            it.maxPrice = found.maxPrice;
+            it.unitPriceUSD = unitPriceUSD;
+          }
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      uncertainItems,
+      hasUncertain: uncertainItems.length > 0,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: '核验失败: ' + err.message });
+  }
+});
+
+// ==================== 保存用户确认数据 ====================
+app.post('/api/save-confirmations', (req, res) => {
+  try {
+    const { confirmations: newData } = req.body;
+    if (!newData || typeof newData !== 'object') {
+      return res.status(400).json({ success: false, message: '请提供确认数据' });
+    }
+
+    const current = readConfirmations();
+    const now = new Date().toISOString();
+    let saved = 0;
+
+    Object.entries(newData).forEach(([sku, info]) => {
+      if (!sku) return;
+      current[sku] = {
+        ...(current[sku] || {}),
+        ...info,
+        confirmedAt: now,
+      };
+      saved++;
+    });
+
+    writeConfirmations(current);
+    console.log('Confirmations saved: ' + saved + ' SKUs');
+    res.json({ success: true, saved });
+  } catch (err) {
+    res.status(500).json({ success: false, message: '保存失败: ' + err.message });
+  }
+});
+
 // ==================== 生成报关文件 ====================
-app.post('/api/generate', (req, res) => {
+app.post('/api/generate', async (req, res) => {
   try {
     const settings = readSettings();
     const exchangeRate = parseFloat(settings.exchangeRate) || 7.25;
@@ -646,8 +827,15 @@ app.post('/api/generate', (req, res) => {
     });
     lookupResult.notFound = stillNotFound;
 
-    // 用户确认的货源地
+    // 用户确认的货源地（前端传来的 + 历史保存的）
     const confirmedLocations = req.body.confirmedLocations || {};
+    const savedConfirmations = readConfirmations();
+    // 合并：前端传来的优先，历史保存的作为后备
+    Object.entries(savedConfirmations).forEach(([sku, info]) => {
+      if (!confirmedLocations[sku] && info.domesticSource) {
+        confirmedLocations[sku] = info.domesticSource;
+      }
+    });
 
     // 构建用于生成的产品列表
     const genProducts = invoiceProducts.map(invProd => {
@@ -744,7 +932,7 @@ app.post('/api/generate', (req, res) => {
     const validation = validateConsistency(genProducts, genBoxes);
 
     // 调用模板生成模块
-    templateGen.generate({
+    await templateGen.generate({
       products: validation.products,
       boxes: validation.boxes,
       destination: destination,

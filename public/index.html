@@ -1,8 +1,11 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	    } else {
+	      updateSteps(3);
+	      Object.values(data.found).forEach(item => {
+	        STATE.confirmedLocations[item.sku] = item.city || '';
+	      });
 <title>报关辅助系统 v2</title>
 <style>
 :root {
@@ -111,6 +114,20 @@ input.error{border-color:var(--danger)!important;background:#fff5f5!important;bo
 .manual-item-row label{font-size:11px;color:var(--text2);min-width:36px}
 .manual-item-row input{flex:1;min-width:80px;padding:6px 8px;font-size:12px}
 .manual-item-prev{font-size:10px;color:var(--success);margin-top:4px}
+/* 生成前核验弹窗 */
+.review-item{background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.review-item.warn{border-color:#ff9800;background:#fff8e1}
+.review-item.error{border-color:#ef5350;background:#ffebee}
+.review-sku{font-family:'SF Mono','Consolas',monospace;font-size:12px;font-weight:700;color:var(--primary);min-width:130px}
+.review-name{font-size:13px;font-weight:500;min-width:90px}
+.review-field{font-size:11px;color:#e65100;background:#fff3e0;padding:2px 8px;border-radius:4px;white-space:nowrap}
+.review-reason{font-size:11px;color:var(--text2);flex-basis:100%}
+.review-saved{font-size:11px;color:#2e7d32;background:#e8f5e9;padding:2px 8px;border-radius:4px;white-space:nowrap}
+.review-reuse-btn{font-size:11px;padding:3px 10px;background:#2e7d32;color:#fff;border:none;border-radius:4px;cursor:pointer;white-space:nowrap}
+.review-reuse-btn:hover{background:#1b5e20}
+.review-input{flex:1;min-width:120px;padding:7px 10px;font-size:13px;border:1.5px solid var(--border);border-radius:6px;outline:none}
+.review-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,115,232,.15)}
+.review-supplier{font-size:11px;color:var(--text2);white-space:nowrap}
 .footer{text-align:center;padding:12px;color:#9aa0a6;font-size:11px}
 </style>
 </head>
@@ -300,6 +317,24 @@ input.error{border-color:var(--danger)!important;background:#fff5f5!important;bo
     <div class="btn-row">
       <button class="btn btn-outline" onclick="closeManualDataModal()">跳过</button>
       <button class="btn btn-success" onclick="saveManualData()">💾 保存并继续</button>
+    </div>
+  </div>
+</div>
+
+<!-- 生成前数据核验弹窗 -->
+<div class="modal-overlay" id="reviewModal">
+  <div class="modal" style="max-width:700px">
+    <h3>🔍 数据确认 — 以下信息需要您补充</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:8px">
+      以下字段存在不确定数据，请逐项确认或修正后再生成报关文件：
+    </p>
+    <div id="reviewPrevInfo" style="display:none;font-size:12px;background:#e8f5e9;padding:8px 12px;border-radius:6px;margin-bottom:8px;color:#2e7d32">
+      💡 部分 SKU 有之前保存的数据，可点击「延用」快速填充。
+    </div>
+    <div id="reviewList" style="max-height:400px;overflow-y:auto"></div>
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn btn-outline" onclick="closeReviewModal()">跳过（可能导致数据不完整）</button>
+      <button class="btn btn-success" onclick="confirmReview()">✅ 确认并生成</button>
     </div>
   </div>
 </div>
@@ -550,6 +585,7 @@ async function uploadFile(file) {
 
     // 自动查询产品数据库
     await lookupProducts();
+	    setTimeout(() => generateFile(), 400);
   } catch(e) {
     clearInterval(simTimer);
     progFill.style.width = '100%';
@@ -601,17 +637,15 @@ async function lookupProducts() {
     renderProductTable();
     updateSteps(2);
 
-    // 处理流程: 1)人工数据弹窗 → 2)货源地弹窗
-    if (data.notFound.length > 0) {
-      showManualDataModal(data.notFound);
-    } else if (uncertain.length > 0) {
-      showLocationModal(uncertain);
-    } else {
-      updateSteps(3);
-      Object.values(data.found).forEach(item => {
-        STATE.confirmedLocations[item.sku] = item.city;
-      });
-    }
+    // 处理流程: 未找到的产品 → 人工数据弹窗（其他不确定项由generateFile()统一处理）
+	    if (data.notFound.length > 0) {
+	      showManualDataModal(data.notFound);
+	    } else {
+	      updateSteps(3);
+	      Object.values(data.found).forEach(item => {
+	        STATE.confirmedLocations[item.sku] = item.city || '';
+	      });
+	    }
   } catch(e) {
     info.className = 'info-bar err';
     info.innerHTML = '❌ ' + e.message;
@@ -687,8 +721,9 @@ async function saveManualData() {
     showToast('✅ 已保存 ' + Object.keys(entries).length + ' 个产品数据', 'ok');
     closeManualDataModal();
 
-    // 重新查询以使用刚保存的数据
+    // 重新查询以使用刚保存的数据 → 自动生成
     await lookupProducts();
+	    setTimeout(() => generateFile(), 400);
   } catch(e) {
     showToast('保存失败: ' + e.message, 'err');
   }
@@ -802,16 +837,30 @@ async function generateFile() {
     return;
   }
 
-  // 检查是否有未确认的货源地
-  if (STATE.lookupResult) {
-    const uncertain = Object.values(STATE.lookupResult.found).filter(f => f.cityUncertain);
-    if (uncertain.length > 0) {
-      showToast('请先确认 ' + uncertain.length + ' 个产品的境内货源地', 'err');
-      showLocationModal(uncertain);
-      return;
-    }
+  // 检查是否有发票数据
+  if (!STATE.invoiceProducts || STATE.invoiceProducts.length === 0) {
+    showToast('请先上传并解析发票文件', 'err');
+    return;
   }
 
+  // === 调用 preflight-check 核验所有不确定数据 ===
+  const skus = STATE.invoiceProducts.map(p => p.sku);
+  try {
+    const check = await api('POST', '/api/preflight-check', { skus });
+    if (check.hasUncertain && check.uncertainItems.length > 0) {
+      showReviewModal(check.uncertainItems);
+      return;
+    }
+  } catch(e) {
+    showToast('数据核验失败: ' + e.message, 'err');
+    return;
+  }
+
+  // 无需核验，直接生成
+  await doGenerate();
+}
+
+async function doGenerate() {
   // 先保存设置
   await saveSettingsSilent();
 
@@ -834,6 +883,115 @@ async function generateFile() {
     btn.disabled = false;
     btn.textContent = '⬇ 生成并下载报关文件';
   }
+}
+
+// ==================== 生成前数据核验弹窗 ====================
+function showReviewModal(items) {
+  const list = document.getElementById('reviewList');
+  const prevInfo = document.getElementById('reviewPrevInfo');
+  let hasPrev = false;
+
+  list.innerHTML = items.map((item, i) => {
+    const hasPrevData = item.savedValue && item.savedValue !== '';
+    if (hasPrevData) hasPrev = true;
+
+    const severityClass = item.field === 'all' ? 'error' : 'warn';
+    const fieldLabel = item.label;
+    const skuName = item.nameCN || item.sku;
+
+    let prevSection = '';
+    if (hasPrevData) {
+      let prevDisplay = item.savedValue;
+      if (item.field === 'all' && item.savedData) {
+        const sd = item.savedData;
+        prevDisplay = [sd.supplier, sd.domesticSource, sd.maxPrice ? '¥' + sd.maxPrice : ''].filter(Boolean).join(' / ') || '(有历史数据)';
+      }
+      prevSection = '<span class="review-saved">📋 上次: ' + escapeHTML(String(prevDisplay)) + '</span>' +
+        '<button class="review-reuse-btn" onclick="reuseConfirm(' + i + ')">延用</button>';
+    }
+
+    return '<div class="review-item ' + severityClass + '">' +
+      '<span class="review-sku">' + escapeHTML(item.sku) + '</span>' +
+      '<span class="review-name">' + escapeHTML(skuName) + '</span>' +
+      '<span class="review-field">⚠ ' + escapeHTML(fieldLabel) + '</span>' +
+      (item.supplier ? '<span class="review-supplier">供应商: ' + escapeHTML(item.supplier) + '</span>' : '') +
+      prevSection +
+      '<input class="review-input" id="reviewInput' + i + '" ' +
+      'data-sku="' + escapeHTML(item.sku) + '" data-field="' + item.field + '" ' +
+      'placeholder="' + (hasPrevData ? '点击「延用」或手动输入' : item.reason) + '" ' +
+      'value="' + escapeHTML(item.currentValue || '') + '">' +
+      '<div class="review-reason">' + escapeHTML(item.reason) + '</div>' +
+      '</div>';
+  }).join('');
+
+  prevInfo.style.display = hasPrev ? 'block' : 'none';
+  document.getElementById('reviewModal').classList.add('show');
+}
+
+function closeReviewModal() {
+  document.getElementById('reviewModal').classList.remove('show');
+}
+
+function reuseConfirm(idx) {
+  const input = document.getElementById('reviewInput' + idx);
+  const itemDiv = input.closest('.review-item');
+  const savedSpan = itemDiv.querySelector('.review-saved');
+  if (savedSpan) {
+    // Extract the saved value from the display text
+    const text = savedSpan.textContent.replace('📋 上次: ', '').trim();
+    if (text && text !== '(有历史数据)') {
+      input.value = text;
+    }
+  }
+  input.focus();
+}
+
+async function confirmReview() {
+  const inputs = document.querySelectorAll('#reviewList .review-input');
+  const confirmations = {};
+  const confirmedLocations = { ...STATE.confirmedLocations };
+
+  inputs.forEach(input => {
+    const sku = input.dataset.sku;
+    const field = input.dataset.field;
+    const value = input.value.trim();
+
+    if (!value) return;
+    if (!confirmations[sku]) confirmations[sku] = {};
+
+    if (field === 'domesticSource') {
+      confirmations[sku].domesticSource = value;
+      confirmedLocations[sku] = value;
+    } else if (field === 'supplier') {
+      confirmations[sku].supplier = value;
+    } else if (field === 'maxPrice') {
+      confirmations[sku].maxPrice = parseFloat(value) || 0;
+    } else if (field === 'all') {
+      // For 'all' field, the value is free-form; save as domesticSource
+      confirmations[sku].domesticSource = value;
+      confirmedLocations[sku] = value;
+    }
+  });
+
+  // Save confirmations to server
+  if (Object.keys(confirmations).length > 0) {
+    try {
+      await api('POST', '/api/save-confirmations', { confirmations });
+    } catch(e) {
+      console.error('Failed to save confirmations:', e);
+    }
+  }
+
+  STATE.confirmedLocations = confirmedLocations;
+  closeReviewModal();
+  showToast('数据已确认，正在生成...', 'ok');
+  await doGenerate();
+}
+
+function escapeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 async function saveSettingsSilent() {
