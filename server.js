@@ -187,43 +187,11 @@ function parseInvoice(filePath) {
       }
     }
 
-    // 收集行尾所有数字（数量和价格/箱序号）
-    const tailNums = [];
-    for (let j = Math.max(hsIdx + 1, 8); j < row.length; j++) {
-      const val = row[j];
-      if (typeof val === 'number' && val > 0) {
-        tailNums.push(val);
-      }
-    }
-
-    // 区分: 每箱第一行的行尾数字=箱序号(不参与汇总)
-    //        后续行的行尾数字 = 数量(单箱) + 可选单价
-    let qtyPerBox = 0;
-    let unitPriceEUR = 0;
-
-    if (isNewBox) {
-      // 箱首行: 尾数字是箱序号, 该SKU在此箱的数量默认=1
-      qtyPerBox = 1;
-    } else {
-      // 非首行: 尾数字是 qty + 可选 price
-      if (tailNums.length === 1) {
-        qtyPerBox = tailNums[0];
-      } else if (tailNums.length >= 2) {
-        // 小数(or <50)的是价格, 整数(>=1)的是数量
-        for (let k = tailNums.length - 1; k >= 0; k--) {
-          const n = tailNums[k];
-          if ((n !== Math.floor(n) || n < 50) && n < 1000) {
-            unitPriceEUR = n;
-            qtyPerBox = tailNums.slice(0, k).reduce((a, b) => a + b, 0);
-            break;
-          }
-        }
-        if (unitPriceEUR === 0 && qtyPerBox === 0) {
-          qtyPerBox = tailNums[0];
-          unitPriceEUR = tailNums[1] || 0;
-        }
-      }
-    }
+    // ★ 直接按发票模板列位读取数量和单价 ★
+    // 模板 R9 表头: col 13=产品数量(单箱), col 15=申报单价(EUR)
+    // 不再使用"猜尾数"的启发式逻辑
+    const qtyPerBox = (typeof row[13] === 'number' && row[13] > 0) ? row[13] : 1;
+    const unitPriceEUR = (typeof row[15] === 'number' && row[15] > 0) ? row[15] : 0;
 
     // 收集SKU价格
     if (unitPriceEUR > 0) {
