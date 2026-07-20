@@ -1,0 +1,170 @@
+{
+  "overrides": {
+    "F3954-508-46H6": {
+      "quantity": 30,
+      "unit": "个",
+      "unitPriceCNY": 64.8,
+      "unitPriceUSD": 11.9469,
+      "netWeight": 64.5,
+      "domesticSource": "任丘",
+      "hsCode": 6702900000,
+      "usage": "家居用品",
+      "_hsCode": 6702900000
+    },
+    "FUK-511-RM1M1": {
+      "quantity": 40,
+      "unit": "个",
+      "unitPriceCNY": 22.5,
+      "unitPriceUSD": 4.14823,
+      "netWeight": 148,
+      "domesticSource": "沧州",
+      "hsCode": 3926909790,
+      "usage": "家居用品",
+      "_hsCode": 3926909790
+    },
+    "FUK-507-610H": {
+      "quantity": 30,
+      "unit": "个",
+      "unitPriceCNY": 40.33,
+      "unitPriceUSD": 7.43547,
+      "netWeight": 55.5,
+      "domesticSource": "中山",
+      "hsCode": 3917310000,
+      "usage": "家居用品",
+      "_hsCode": 3917310000
+    },
+    "FUK-602-GY505": {
+      "quantity": 50,
+      "unit": "个",
+      "unitPriceCNY": 37,
+      "unitPriceUSD": 6.82153,
+      "netWeight": 67.5,
+      "domesticSource": "广州",
+      "hsCode": 4008110000,
+      "usage": "家居用品",
+      "_hsCode": 4008110000
+    },
+    "FUK-512-C2KG": {
+      "quantity": 26,
+      "unit": "个",
+      "unitPriceCNY": 4.54,
+      "unitPriceUSD": 0.83702,
+      "netWeight": 52,
+      "domesticSource": "深圳",
+      "hsCode": 3824999999,
+      "usage": "家居用品",
+      "_hsCode": 3824999999
+    },
+    "FUK-602-GY510": {
+      "quantity": 5,
+      "unit": "个",
+      "unitPriceCNY": 82.5,
+      "unitPriceUSD": 15.21018,
+      "netWeight": 13.5,
+      "domesticSource": "广州",
+      "hsCode": 4008110000,
+      "usage": "家居用品",
+      "_hsCode": 4008110000
+    },
+    "FUK-504-1355": {
+      "quantity": 26,
+      "unit": "个",
+      "unitPriceCNY": 38.89,
+      "unitPriceUSD": 7.16999,
+      "netWeight": 31.2,
+      "domesticSource": "东莞",
+      "hsCode": 5601229000,
+      "usage": "家居用品",
+      "_hsCode": 5601229000
+    },
+    "FUK-509-37353": {
+      "quantity": 21,
+      "unit": "个",
+      "unitPriceCNY": 4.54,
+      "unitPriceUSD": 0.83702,
+      "netWeight": 11.55,
+      "domesticSource": "东莞",
+      "hsCode": 5601229000,
+      "usage": "家居用品",
+      "_hsCode": 5601229000
+    },
+    "FUK-511-RM1M115": {
+      "quantity": 9,
+      "unit": "个",
+      "unitPriceCNY": 34.5,
+      "unitPriceUSD": 6.36062,
+      "netWeight": 45.045,
+      "domesticSource": "沧州",
+      "hsCode": 3926909790,
+      "usage": "家居用品",
+      "_hsCode": 3926909790
+    },
+    "FUK-601-FCDB": {
+      "quantity": 20,
+      "unit": "个",
+      "unitPriceCNY": 12.4,
+      "unitPriceUSD": 2.28614,
+      "netWeight": 10,
+      "domesticSource": "南京",
+      "hsCode": 8302490099,
+      "usage": "家居用品",
+      "_hsCode": 8302490099
+    },
+    "FUK-507-85H": {
+      "quantity": 30,
+      "unit": "个",
+      "unitPriceCNY": 24.5,
+      "unitPriceUSD": 4.51696,
+      "netWeight": 46.5,
+      "domesticSource": "中山",
+      "hsCode": 3917310000,
+      "usage": "家居用品",
+      "_hsCode": 3917310000
+    },
+    "FUK-505-3086": {
+      "quantity": 6,
+      "unit": "个",
+      "unitPriceCNY": 28.8,
+      "unitPriceUSD": 5.30973,
+      "netWeight": 12.9,
+      "domesticSource": "任丘",
+      "hsCode": 6702100000,
+      "usage": "家居用品",
+      "_hsCode": 6702100000
+    },
+    "FUK-507-85W": {
+      "quantity": 4,
+      "unit": "个",
+      "unitPriceCNY": 29.43,
+      "unitPriceUSD": 5.42588,
+      "netWeight": 6.2,
+      "domesticSource": "中山",
+      "hsCode": 3917310000,
+      "usage": "家居用品",
+      "_hsCode": 3917310000
+    },
+    "FUK-507-55H": {
+      "quantity": 23,
+      "unit": "个",
+      "unitPriceCNY": 16.4,
+      "unitPriceUSD": 3.0236,
+      "netWeight": 20.7,
+      "domesticSource": "中山",
+      "hsCode": 3917310000,
+      "usage": "家居用品",
+      "_hsCode": 3917310000
+    },
+    "FUK-506-TCM": {
+      "quantity": 80,
+      "unit": "个",
+      "unitPriceCNY": 23.76,
+      "unitPriceUSD": 4.38053,
+      "netWeight": 80,
+      "domesticSource": "东莞",
+      "hsCode": 5601229000,
+      "usage": "家居用品",
+      "_hsCode": 5601229000
+    }
+  },
+  "savedAt": "2026-07-20T09:07:28.030Z"
+}

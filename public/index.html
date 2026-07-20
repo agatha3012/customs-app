@@ -56,6 +56,14 @@ input.error{border-color:var(--danger)!important;background:#fff5f5!important;bo
 .upload-zone .hint{font-size:12px;color:#9aa0a6;margin-top:4px}
 .upload-zone input[type="file"]{display:none}
 .upload-zone.disabled{pointer-events:none;opacity:.55}
+/* 数据库上传区域（紧凑版） */
+.db-upload-zone{border:2px dashed #b0bec5;border-radius:10px;padding:18px 16px;text-align:center;cursor:pointer;transition:all .2s;background:#fafbfc;margin-top:12px}
+.db-upload-zone:hover,.db-upload-zone.drag-over{border-color:var(--primary);background:#e8f0fe}
+.db-upload-zone .db-upload-icon{font-size:28px;margin-bottom:4px}
+.db-upload-zone p{color:var(--text2);font-size:13px}
+.db-upload-zone .hint{font-size:11px;color:#9aa0a6;margin-top:2px}
+.db-upload-zone input[type="file"]{display:none}
+.db-upload-zone.disabled{pointer-events:none;opacity:.55}
 /* 文件预览卡片 */
 .file-preview{display:flex;align-items:center;gap:12px;background:#fff;border:1.5px solid #c8e6c9;border-radius:10px;padding:14px 18px;margin-top:12px;text-align:left}
 .file-preview-icon{font-size:36px;flex-shrink:0}
@@ -128,6 +136,20 @@ input.error{border-color:var(--danger)!important;background:#fff5f5!important;bo
 .review-input{flex:1;min-width:120px;padding:7px 10px;font-size:13px;border:1.5px solid var(--border);border-radius:6px;outline:none}
 .review-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,115,232,.15)}
 .review-supplier{font-size:11px;color:var(--text2);white-space:nowrap}
+/* 人工审查表格 */
+.review-edit-table{width:100%;border-collapse:collapse;font-size:12px}
+.review-edit-table th{background:#f0f4f8;font-weight:600;color:var(--text2);font-size:11px;padding:8px 6px;text-align:center;border:1px solid #e0e0e0;position:sticky;top:0;z-index:1}
+.review-edit-table td{padding:4px 4px;border:1px solid #e8e8e8;text-align:center}
+.review-edit-table td.editable{padding:0}
+.review-edit-table td.editable input,.review-edit-table td.editable select{width:100%;border:none;padding:6px 4px;font-size:12px;text-align:center;background:#fff;outline:none;box-sizing:border-box}
+.review-edit-table td.editable input:focus{background:#e8f0fe;box-shadow:inset 0 0 0 2px var(--primary)}
+.review-edit-table td.readonly{background:#fafafa;color:var(--text2)}
+.review-edit-table .sku-col{font-family:'SF Mono','Consolas',monospace;font-size:11px;font-weight:600;color:var(--primary);text-align:left}
+.review-edit-table .name-col{text-align:left;font-size:12px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.review-edit-table .price-modified{background:#fff8e1!important}
+.review-edit-table .price-modified input{background:#fff8e1!important;font-weight:700;color:#e65100}
+.review-summary{background:#f5f5f5;padding:12px 16px;border-radius:8px;margin-top:12px;display:flex;gap:24px;flex-wrap:wrap;font-size:13px}
+.review-summary strong{color:var(--primary)}
 .footer{text-align:center;padding:12px;color:#9aa0a6;font-size:11px}
 </style>
 </head>
@@ -204,18 +226,27 @@ input.error{border-color:var(--danger)!important;background:#fff5f5!important;bo
       <h2>产品数据库</h2>
       <span id="dbStatus" style="margin-left:auto;font-size:12px;color:var(--text2)">加载中...</span>
     </div>
-    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
       <div style="flex:1;min-width:200px">
         <div class="db-stats" id="dbStats" style="font-size:13px;color:var(--text2);line-height:1.8">
           未加载
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn btn-outline" id="btnUploadDB" onclick="document.getElementById('dbFileInput').click()">
-          📤 上传备货单
-        </button>
-        <input type="file" id="dbFileInput" accept=".xlsx,.xls" onchange="handleDBUpload(event)" style="display:none">
+    </div>
+    <!-- 数据库拖拽上传区域 -->
+    <div class="db-upload-zone" id="dbUploadZone" onclick="triggerDBUpload()">
+      <div class="db-upload-icon" id="dbUploadIcon">📤</div>
+      <p id="dbUploadText">拖拽备货单 Excel 到此处，或 <strong>点击选择</strong></p>
+      <p class="hint" id="dbUploadHint">支持 .xlsx / .xls / .et（备货单/出货记录）</p>
+      <div class="file-preview" id="dbFilePreview" style="display:none">
+        <div class="file-preview-icon">📄</div>
+        <div class="file-preview-info">
+          <span class="file-preview-name" id="dbFileNameDisplay"></span>
+          <span class="file-preview-size" id="dbFileSizeDisplay"></span>
+        </div>
+        <button class="file-preview-remove" onclick="event.stopPropagation();removeDBFile()" title="移除文件">✕</button>
       </div>
+      <input type="file" id="dbFileInput" accept=".xlsx,.xls,.et" onchange="handleDBFileSelect(event)">
     </div>
     <div id="dbUploadInfo" class="info-bar" style="display:none;margin-top:10px"></div>
   </div>
@@ -240,7 +271,7 @@ input.error{border-color:var(--danger)!important;background:#fff5f5!important;bo
     <div class="upload-zone" id="uploadZone" onclick="triggerUpload()">
       <div class="icon" id="uploadIcon">📁</div>
       <p id="uploadText">拖拽报关发票 Excel 到此处，或 <strong>点击选择</strong></p>
-      <p class="hint" id="uploadHint">支持 .xlsx / .xls（CIPI 工作表格式）</p>
+      <p class="hint" id="uploadHint">支持 .xlsx / .xls / .et（CIPI 工作表格式）</p>
       <div class="file-preview" id="filePreview" style="display:none">
         <div class="file-preview-icon">📄</div>
         <div class="file-preview-info">
@@ -253,7 +284,7 @@ input.error{border-color:var(--danger)!important;background:#fff5f5!important;bo
         <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
         <span class="progress-text" id="progressText">上传中...</span>
       </div>
-      <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(event)">
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.et" onchange="handleFile(event)">
     </div>
 
     <!-- 状态栏 -->
@@ -339,6 +370,51 @@ input.error{border-color:var(--danger)!important;background:#fff5f5!important;bo
   </div>
 </div>
 
+<!-- 人工审查数据弹窗 -->
+<div class="modal-overlay" id="manualReviewModal">
+  <div class="modal" style="max-width:1100px">
+    <h3>📋 人工审查 — 确认并修改报关数据</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:8px">
+      以下是即将写入报关文件的数据，可直接点击修改<strong>黄色高亮</strong>的单元格。修改后点击底部「确认并生成」。
+    </p>
+    <div class="review-summary" id="reviewSummary"></div>
+    <div style="max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:8px">
+      <table class="review-edit-table" id="reviewEditTable">
+        <thead>
+          <tr>
+            <th>SKU</th><th>品名</th><th>规格/描述</th><th>数量</th><th>单位</th>
+            <th>进价(¥)</th><th>单价(USD)</th><th>总价(USD)</th>
+            <th>单净重(kg)</th><th>货源地</th><th>商品编码</th><th>商检编码</th><th>材质</th><th>用途</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="closeManualReview()">返回修改</button>
+      <button class="btn btn-success btn-lg" id="btnReviewGenerate" onclick="doGenerateWithOverrides()">
+        ✅ 确认并生成报关文件
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 人工审查数据复用确认弹窗 -->
+<div class="modal-overlay" id="reuseDataModal">
+  <div class="modal" style="max-width:550px">
+    <h3>📋 检测到上次修改记录</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">
+      您在 <strong id="reuseSavedTime"></strong> 对 <strong id="reuseSavedCount"></strong> 个 SKU 的数据做过修改。
+    </p>
+    <div id="reusePreview" style="max-height:200px;overflow-y:auto;background:#f8f9fa;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;font-family:monospace"></div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px">是否延用这些修改到本次报关文件？</p>
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="closeReuseModal(false)">不使用，重新填写</button>
+      <button class="btn btn-success" onclick="closeReuseModal(true)">✅ 延用上次数据</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -405,22 +481,93 @@ async function refreshDBStatus() {
   }
 }
 
-/** 上传备货单并合并到数据库 */
-async function handleDBUpload(e) {
-  const file = e.target.files[0];
-  if (!file) return;
+// ==================== 数据库拖拽上传 ====================
+let _dbUploading = false;
+let _dbFile = null; // 当前已选/已上传的数据库文件
 
-  const btn = document.getElementById('btnUploadDB');
+/** 点击上传区域触发文件选择 */
+function triggerDBUpload() {
+  if (_dbUploading) return;
+  document.getElementById('dbFileInput').click();
+}
+
+// 拖拽事件
+['dragenter','dragover'].forEach(e => {
+  dbUploadZone.addEventListener(e, ev => {
+    ev.preventDefault();
+    if (!_dbUploading) dbUploadZone.classList.add('drag-over');
+  });
+});
+['dragleave','drop'].forEach(e => {
+  dbUploadZone.addEventListener(e, ev => {
+    ev.preventDefault();
+    dbUploadZone.classList.remove('drag-over');
+  });
+});
+dbUploadZone.addEventListener('drop', e => {
+  if (_dbUploading) return;
+  const f = e.dataTransfer.files[0];
+  if (f) selectDBFile(f);
+});
+
+/** input change 事件处理 */
+function handleDBFileSelect(e) {
+  const f = e.target.files[0];
+  if (f) selectDBFile(f);
+}
+
+/** 文件选中后校验 + 预览 + 上传 */
+function selectDBFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext !== 'xlsx' && ext !== 'xls' && ext !== 'et') {
+    showToast('仅支持 .xlsx / .xls / .et 格式文件', 'err');
+    return;
+  }
+  // 显示文件预览（重置样式，去掉上次上传的成功/失败标记）
+  _dbFile = file;
+  document.getElementById('dbFileNameDisplay').textContent = file.name;
+  document.getElementById('dbFileNameDisplay').style.color = '';
+  document.getElementById('dbFileSizeDisplay').textContent = formatSize(file.size);
+  document.getElementById('dbFilePreview').style.display = 'flex';
+  document.getElementById('dbFilePreview').style.borderColor = '';
+  document.getElementById('dbUploadIcon').style.display = 'none';
+  document.getElementById('dbUploadText').style.display = 'none';
+  document.getElementById('dbUploadHint').style.display = 'none';
+
+  uploadDBFile(file);
+}
+
+/** 移除已上传的数据库文件 */
+function removeDBFile() {
+  _dbFile = null;
+  document.getElementById('dbFileInput').value = '';
+  document.getElementById('dbFilePreview').style.display = 'none';
+  document.getElementById('dbUploadIcon').style.display = '';
+  document.getElementById('dbUploadText').style.display = '';
+  document.getElementById('dbUploadHint').style.display = '';
+  // 隐藏信息栏（但保留之前的合并结果在数据库中）
   const info = document.getElementById('dbUploadInfo');
-  btn.disabled = true;
-  btn.textContent = '⏳ 上传中...';
+  info.style.display = 'none';
+}
+
+/** 上传备货单并合并到数据库 */
+async function uploadDBFile(file) {
+  _dbUploading = true;
+  dbUploadZone.classList.add('disabled');
+
+  const info = document.getElementById('dbUploadInfo');
   info.style.display = 'flex';
   info.className = 'info-bar warn';
-  info.innerHTML = '⏳ 正在上传并合并: <strong>' + file.name + '</strong>...';
+  const sizeMB = (file.size / 1048576).toFixed(1);
+  info.innerHTML = '⏳ 正在上传: <strong>' + file.name + '</strong> (' + sizeMB + ' MB)...<br><span style="font-size:11px">大文件请耐心等待，约需 1-3 分钟</span>';
 
   const fd = new FormData(); fd.append('file', file);
+  // ★ 大文件上传: 5 分钟超时
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5 * 60 * 1000);
   try {
-    const res = await fetch('/api/upload-product-db', { method: 'POST', body: fd });
+    const res = await fetch('/api/upload-product-db', { method: 'POST', body: fd, signal: ctrl.signal });
+    clearTimeout(timer);
     const data = await res.json();
     if (!data.success) throw new Error(data.message);
 
@@ -428,6 +575,10 @@ async function handleDBUpload(e) {
     info.innerHTML = '✅ <strong>' + file.name + '</strong> 合并完成 — ' +
       data.newAdded + ' 个新增, ' + data.updated + ' 个更新, ' +
       data.kept + ' 个保留 → 共 <strong>' + data.totalSKUs + '</strong> SKU';
+
+    // 更新预览卡片显示上传成功状态
+    document.getElementById('dbFilePreview').style.borderColor = '#81c784';
+    document.getElementById('dbFileNameDisplay').style.color = '#2e7d32';
 
     refreshDBStatus();
     // 如果已有发票数据，自动重新查询
@@ -437,10 +588,12 @@ async function handleDBUpload(e) {
   } catch(e) {
     info.className = 'info-bar err';
     info.innerHTML = '❌ 上传失败: ' + e.message;
+    // 上传失败恢复预览状态
+    document.getElementById('dbFilePreview').style.borderColor = '#ef5350';
+    showToast('上传失败: ' + e.message, 'err');
   } finally {
-    btn.disabled = false;
-    btn.textContent = '📤 上传备货单';
-    document.getElementById('dbFileInput').value = '';
+    _dbUploading = false;
+    dbUploadZone.classList.remove('disabled');
   }
 }
 
@@ -503,13 +656,8 @@ function handleFile(e) { const f = e.target.files[0]; if (f) selectFile(f); }
 function selectFile(file) {
   // 校验类型
   const ext = file.name.split('.').pop().toLowerCase();
-  if (ext !== 'xlsx' && ext !== 'xls') {
-    showToast('仅支持 .xlsx / .xls 格式文件', 'err');
-    return;
-  }
-  // 校验大小 (< 50MB)
-  if (file.size > 50 * 1024 * 1024) {
-    showToast('文件大小不能超过 50MB', 'err');
+  if (ext !== 'xlsx' && ext !== 'xls' && ext !== 'et') {
+    showToast('仅支持 .xlsx / .xls / .et 格式文件', 'err');
     return;
   }
 
@@ -856,8 +1004,8 @@ async function generateFile() {
     return;
   }
 
-  // 无需核验，直接生成
-  await doGenerate();
+  // 无需核验，先展示人工审查
+  await showManualReview();
 }
 
 async function doGenerate() {
@@ -891,7 +1039,38 @@ function showReviewModal(items) {
   const prevInfo = document.getElementById('reviewPrevInfo');
   let hasPrev = false;
 
-  list.innerHTML = items.map((item, i) => {
+  // ★ 展开 field='all' 的条目为三个独立条目，各带自己的 savedValue
+  const expanded = [];
+  items.forEach(item => {
+    if (item.field === 'all' && item.savedData) {
+      const sd = item.savedData;
+      // 进价
+      expanded.push({
+        sku: item.sku, nameCN: item.nameCN,
+        field: 'maxPrice', label: '最高进价(¥)',
+        currentValue: '', savedValue: sd.maxPrice ? String(sd.maxPrice) : '',
+        reason: '产品数据库中未找到此SKU', supplier: '',
+      });
+      // 供应商
+      expanded.push({
+        sku: item.sku, nameCN: item.nameCN,
+        field: 'supplier', label: '供应商',
+        currentValue: '', savedValue: sd.supplier || '',
+        reason: '产品数据库中未找到此SKU', supplier: '',
+      });
+      // 货源地
+      expanded.push({
+        sku: item.sku, nameCN: item.nameCN,
+        field: 'domesticSource', label: '境内货源地',
+        currentValue: '', savedValue: sd.domesticSource || '',
+        reason: '产品数据库中未找到此SKU', supplier: '',
+      });
+    } else {
+      expanded.push(item);
+    }
+  });
+
+  list.innerHTML = expanded.map((item, i) => {
     const hasPrevData = item.savedValue && item.savedValue !== '';
     if (hasPrevData) hasPrev = true;
 
@@ -901,12 +1080,8 @@ function showReviewModal(items) {
 
     let prevSection = '';
     if (hasPrevData) {
-      let prevDisplay = item.savedValue;
-      if (item.field === 'all' && item.savedData) {
-        const sd = item.savedData;
-        prevDisplay = [sd.supplier, sd.domesticSource, sd.maxPrice ? '¥' + sd.maxPrice : ''].filter(Boolean).join(' / ') || '(有历史数据)';
-      }
-      prevSection = '<span class="review-saved">📋 上次: ' + escapeHTML(String(prevDisplay)) + '</span>' +
+      const prevDisplay = item.savedValue;
+      prevSection = '<span class="review-saved" data-saved="' + escapeHTML(String(prevDisplay)) + '">📋 上次: ' + escapeHTML(String(prevDisplay)) + '</span>' +
         '<button class="review-reuse-btn" onclick="reuseConfirm(' + i + ')">延用</button>';
     }
 
@@ -936,12 +1111,8 @@ function reuseConfirm(idx) {
   const input = document.getElementById('reviewInput' + idx);
   const itemDiv = input.closest('.review-item');
   const savedSpan = itemDiv.querySelector('.review-saved');
-  if (savedSpan) {
-    // Extract the saved value from the display text
-    const text = savedSpan.textContent.replace('📋 上次: ', '').trim();
-    if (text && text !== '(有历史数据)') {
-      input.value = text;
-    }
+  if (savedSpan && savedSpan.dataset.saved) {
+    input.value = savedSpan.dataset.saved;
   }
   input.focus();
 }
@@ -966,10 +1137,6 @@ async function confirmReview() {
       confirmations[sku].supplier = value;
     } else if (field === 'maxPrice') {
       confirmations[sku].maxPrice = parseFloat(value) || 0;
-    } else if (field === 'all') {
-      // For 'all' field, the value is free-form; save as domesticSource
-      confirmations[sku].domesticSource = value;
-      confirmedLocations[sku] = value;
     }
   });
 
@@ -984,8 +1151,296 @@ async function confirmReview() {
 
   STATE.confirmedLocations = confirmedLocations;
   closeReviewModal();
-  showToast('数据已确认，正在生成...', 'ok');
-  await doGenerate();
+  // ★ 先展示人工审查，而非直接生成
+  await showManualReview();
+}
+
+// ==================== 人工审查弹窗 ====================
+let _reviewData = null;       // 当前预览数据
+let _reusedOverrides = null;  // 用户选择复用的覆盖数据
+
+function closeManualReview() {
+  document.getElementById('manualReviewModal').classList.remove('show');
+}
+
+/** 渲染审查表格 — 可从 showManualReview 或 closeReuseModal 调用 */
+function renderReviewTable(previewData, overrides) {
+  const tbody = document.querySelector('#reviewEditTable tbody');
+  const summary = document.getElementById('reviewSummary');
+  const btn = document.getElementById('btnReviewGenerate');
+  const data = previewData;
+  const ov = overrides || {};
+
+  // 渲染汇总
+  const totalQty = data.products.reduce((s, p) => s + p.quantity, 0);
+  const totalNet = data.products.reduce((s, p) => s + p.netWeight, 0);
+  const totalAmt = data.products.reduce((s, p) => s + p.unitPriceUSD * p.quantity, 0);
+  summary.innerHTML =
+    '<span>SKU: <strong>' + data.products.length + '</strong> 种</span>' +
+    '<span>总数量: <strong>' + totalQty + '</strong></span>' +
+    '<span>总净重: <strong>' + totalNet.toFixed(2) + ' kg</strong></span>' +
+    '<span>总金额: <strong>$' + totalAmt.toFixed(2) + '</strong></span>' +
+    '<span>汇率: <strong>' + data.exchangeRate + '</strong> 常数: <strong>' + data.constant + '</strong></span>';
+
+  // 渲染可编辑表格
+  tbody.innerHTML = '';
+  data.products.forEach((p) => {
+    const ou = ov[p.sku] || {};
+    const totalUSD = (p.unitPriceUSD * p.quantity).toFixed(2);
+
+    // ★ 复用数据：用上次保存的值覆盖默认值
+    const qty = ou.quantity !== undefined ? ou.quantity : p.quantity;
+    const unit = ou.unit || p.unit;
+    const cnyPrice = ou.unitPriceCNY !== undefined ? ou.unitPriceCNY : p.unitPriceCNY;
+    const usdPrice = ou.unitPriceUSD !== undefined ? ou.unitPriceUSD : p.unitPriceUSD;
+    const netW = ou.netWeight !== undefined ? ou.netWeight : p.netWeight;
+    const domSrc = ou.domesticSource !== undefined ? ou.domesticSource : (p.domesticSource || '');
+    const hsCode = ou.hsCode !== undefined ? ou.hsCode : (p.hsCodeMerged || p.hsCode || 0);
+    const mat = ou.material !== undefined ? ou.material : (p.material || '');
+    const usg = ou.usage !== undefined ? ou.usage : (p.usage || '');
+    const inspCode = ou.inspectionCode !== undefined ? ou.inspectionCode : (p.inspectionCode || '');
+
+    // 计算复用后的总价
+    const reusedTotal = (usdPrice * qty).toFixed(2);
+
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td class="sku-col">' + escapeHTML(p.sku) + '</td>' +
+      '<td class="name-col" title="' + escapeHTML(p.nameCN) + '">' + escapeHTML(p.nameCN) + '</td>' +
+      '<td class="name-col" title="' + escapeHTML(p.spec || '') + '">' + escapeHTML((p.spec || '').substring(0, 20)) + '</td>' +
+      '<td class="editable"><input data-sku="' + escapeHTML(p.sku) + '" data-field="quantity" type="number" value="' + qty + '" min="1"></td>' +
+      '<td class="editable"><input data-sku="' + escapeHTML(p.sku) + '" data-field="unit" type="text" value="' + escapeHTML(unit) + '" style="max-width:40px"></td>' +
+      '<td class="editable price-modified"><input data-sku="' + escapeHTML(p.sku) + '" data-field="unitPriceCNY" type="number" step="0.01" value="' + cnyPrice.toFixed(2) + '"></td>' +
+      '<td class="editable price-modified"><input data-sku="' + escapeHTML(p.sku) + '" data-field="unitPriceUSD" type="number" step="0.0001" value="' + usdPrice.toFixed(5) + '"></td>' +
+      '<td class="readonly" data-sku="' + escapeHTML(p.sku) + '" data-field="totalUSD">$' + reusedTotal + '</td>' +
+      '<td class="editable"><input data-sku="' + escapeHTML(p.sku) + '" data-field="netWeight" type="number" step="0.001" value="' + netW.toFixed(3) + '"></td>' +
+      '<td class="editable"><input data-sku="' + escapeHTML(p.sku) + '" data-field="domesticSource" type="text" value="' + escapeHTML(domSrc) + '" style="min-width:60px"></td>' +
+      '<td class="editable"><input data-sku="' + escapeHTML(p.sku) + '" data-field="hsCode" type="number" value="' + hsCode + '" style="min-width:85px"></td>' +
+      '<td class="editable"><input data-sku="' + escapeHTML(p.sku) + '" data-field="inspectionCode" type="text" value="' + escapeHTML(inspCode) + '" placeholder="商检编码" style="min-width:85px"></td>' +
+      '<td class="editable"><input data-sku="' + escapeHTML(p.sku) + '" data-field="material" type="text" value="' + escapeHTML(mat) + '" style="min-width:45px"></td>' +
+      '<td class="editable"><input data-sku="' + escapeHTML(p.sku) + '" data-field="usage" type="text" value="' + escapeHTML(usg) + '" style="min-width:45px"></td>';
+    tbody.appendChild(tr);
+  });
+
+  // 绑定单价联动
+  tbody.querySelectorAll('input[data-field="unitPriceCNY"]').forEach(input => {
+    input.addEventListener('input', () => {
+      const sku = input.dataset.sku;
+      const cnyVal = parseFloat(input.value) || 0;
+      const usdInput = tbody.querySelector('input[data-field="unitPriceUSD"][data-sku="' + sku + '"]');
+      const totalCell = tbody.querySelector('td[data-field="totalUSD"][data-sku="' + sku + '"]');
+      const qtyInput = tbody.querySelector('input[data-field="quantity"][data-sku="' + sku + '"]');
+      if (usdInput) { usdInput.value = ((cnyVal * data.constant) / data.exchangeRate).toFixed(5); }
+      if (totalCell && qtyInput) {
+        const q = parseInt(qtyInput.value) || 0;
+        const u = parseFloat(usdInput?.value) || 0;
+        totalCell.textContent = '$' + (u * q).toFixed(2);
+      }
+    });
+  });
+  tbody.querySelectorAll('input[data-field="unitPriceUSD"]').forEach(input => {
+    input.addEventListener('input', () => {
+      const sku = input.dataset.sku;
+      const usdVal = parseFloat(input.value) || 0;
+      const cnyInput = tbody.querySelector('input[data-field="unitPriceCNY"][data-sku="' + sku + '"]');
+      const totalCell = tbody.querySelector('td[data-field="totalUSD"][data-sku="' + sku + '"]');
+      const qtyInput = tbody.querySelector('input[data-field="quantity"][data-sku="' + sku + '"]');
+      if (cnyInput) { cnyInput.value = ((usdVal * data.exchangeRate) / data.constant).toFixed(2); }
+      if (totalCell && qtyInput) {
+        const q = parseInt(qtyInput.value) || 0;
+        totalCell.textContent = '$' + (usdVal * q).toFixed(2);
+      }
+    });
+  });
+  tbody.querySelectorAll('input[data-field="quantity"]').forEach(input => {
+    input.addEventListener('input', () => {
+      const sku = input.dataset.sku;
+      const totalCell = tbody.querySelector('td[data-field="totalUSD"][data-sku="' + sku + '"]');
+      const usdInput = tbody.querySelector('input[data-field="unitPriceUSD"][data-sku="' + sku + '"]');
+      if (totalCell && usdInput) {
+        const q = parseInt(input.value) || 0;
+        const u = parseFloat(usdInput.value) || 0;
+        totalCell.textContent = '$' + (u * q).toFixed(2);
+      }
+    });
+  });
+
+  btn.disabled = false;
+}
+
+async function showManualReview() {
+  await saveSettingsSilent();
+
+  document.getElementById('manualReviewModal').classList.add('show');
+  const tbody = document.querySelector('#reviewEditTable tbody');
+  const btn = document.getElementById('btnReviewGenerate');
+  tbody.innerHTML = '<tr><td colspan="14" style="padding:20px;color:var(--text2)">⏳ 正在加载预览数据...</td></tr>';
+  btn.disabled = true;
+
+  try {
+    // 获取预览数据
+    const data = await api('POST', '/api/preview-data', {
+      confirmedLocations: STATE.confirmedLocations,
+    });
+    _reviewData = data;
+
+    // ★ 检查是否有上次保存的人工审查覆盖数据
+    try {
+      const reuseRes = await api('GET', '/api/review-overrides');
+      if (reuseRes.hasOverrides && Object.keys(reuseRes.overrides).length > 0) {
+        // ★ 按 HS 编码核对：同一 SKU + 同一 HS 编码才允许延用
+        const currentHSCodes = {};
+        _reviewData.products.forEach(p => {
+          currentHSCodes[p.sku] = p.hsCode || p.hsCodeMerged || 0;
+        });
+        let matched = 0, skipped = 0;
+        const filteredOverrides = {};
+        const skippedDetails = [];
+        Object.entries(reuseRes.overrides).forEach(([sku, ov]) => {
+          const savedHS = ov._hsCode || 0;
+          const currentHS = currentHSCodes[sku] || 0;
+          if (!savedHS || !currentHS) {
+            // 无 HS 记录（旧数据），保留
+            filteredOverrides[sku] = ov;
+            matched++;
+          } else if (savedHS === currentHS) {
+            // HS 编码匹配 → 同一产品，可延用
+            filteredOverrides[sku] = ov;
+            matched++;
+          } else {
+            // HS 编码不同 → 不同产品，跳过
+            skipped++;
+            skippedDetails.push(sku + '(上次HS:' + savedHS + ' → 本次HS:' + currentHS + ')');
+          }
+        });
+        reuseRes.overrides = filteredOverrides;
+
+        if (Object.keys(filteredOverrides).length === 0) {
+          // 全部被跳过，直接渲染不弹窗
+          if (skipped > 0) {
+            showToast('⚠ 上次修改的 ' + skipped + ' 个 SKU HS编码与本次不一致，已跳过', 'warn');
+          }
+        } else {
+          // 显示复用确认弹窗
+          const savedAt = new Date(reuseRes.savedAt).toLocaleString('zh-CN');
+          const skuList = Object.keys(filteredOverrides);
+          document.getElementById('reuseSavedTime').textContent = savedAt;
+          document.getElementById('reuseSavedCount').textContent = skuList.length;
+          if (skipped > 0) {
+            document.getElementById('reuseSavedCount').textContent += '（已跳过' + skipped + '个HS不一致的SKU）';
+          }
+
+          // 预览修改内容
+          let previewHtml = '';
+          skuList.slice(0, 6).forEach(sku => {
+            const ov = filteredOverrides[sku];
+            const changes = [];
+            if (ov.unitPriceCNY) changes.push('进价¥' + ov.unitPriceCNY);
+            if (ov.domesticSource) changes.push('货源地:' + ov.domesticSource);
+            if (ov.quantity) changes.push('数量:' + ov.quantity);
+            if (ov.inspectionCode) changes.push('商检:' + ov.inspectionCode);
+            if (ov.netWeight) changes.push('净重:' + ov.netWeight + 'kg');
+            previewHtml += '<div style="margin-bottom:3px"><strong>' + escapeHTML(sku) + '</strong>: ' + escapeHTML(changes.join(', ') || '(有修改)') + '</div>';
+          });
+          if (skuList.length > 6) previewHtml += '<div>...共 ' + skuList.length + ' 个 SKU</div>';
+          document.getElementById('reusePreview').innerHTML = previewHtml;
+
+          _reusedOverrides = filteredOverrides;  // ★ 缓存，供 closeReuseModal 使用
+          document.getElementById('reuseDataModal').classList.add('show');
+          return; // ★ 等待用户选择
+        }
+      }
+    } catch (e) { /* 无缓存数据，继续 */ }
+
+    // 无复用数据，直接渲染
+    renderReviewTable(data, null);
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="14" style="padding:20px;color:var(--danger)">❌ 加载失败: ' + escapeHTML(e.message) + '</td></tr>';
+  }
+}
+
+/** 复用确认弹窗回调 */
+function closeReuseModal(reuse) {
+  document.getElementById('reuseDataModal').classList.remove('show');
+  if (reuse && _reusedOverrides) {
+    renderReviewTable(_reviewData, _reusedOverrides);
+    showToast('✅ 已延用上次修改的 ' + Object.keys(_reusedOverrides).length + ' 个 SKU 数据', 'ok');
+  } else if (reuse) {
+    // 异步获取并渲染
+    (async () => {
+      try {
+        const reuseRes = await api('GET', '/api/review-overrides');
+        _reusedOverrides = reuseRes.overrides || {};
+        renderReviewTable(_reviewData, _reusedOverrides);
+        showToast('✅ 已延用上次修改的 ' + Object.keys(_reusedOverrides).length + ' 个 SKU 数据', 'ok');
+      } catch (e) {
+        renderReviewTable(_reviewData, null);
+      }
+    })();
+  } else {
+    _reusedOverrides = null;
+    renderReviewTable(_reviewData, null);
+    showToast('已跳过，使用默认数据', 'ok');
+  }
+}
+
+/** 收集人工审查的修改并生成文件 */
+async function doGenerateWithOverrides() {
+  const tbody = document.querySelector('#reviewEditTable tbody');
+  const overrides = {};
+
+  tbody.querySelectorAll('input[data-sku]').forEach(input => {
+    const sku = input.dataset.sku;
+    const field = input.dataset.field;
+    const value = input.value.trim();
+    if (value === '') return;
+
+    if (!overrides[sku]) overrides[sku] = {};
+
+    if (field === 'unitPriceUSD' || field === 'unitPriceCNY' || field === 'netWeight') {
+      overrides[sku][field] = parseFloat(value);
+    } else if (field === 'quantity' || field === 'hsCode') {
+      overrides[sku][field] = parseInt(value);
+    } else {
+      overrides[sku][field] = value;
+    }
+  });
+
+  // ★ 附带当前 HS 编码，下次延用时核对是否同一产品
+  _reviewData.products.forEach(p => {
+    if (overrides[p.sku]) {
+      overrides[p.sku]._hsCode = p.hsCode || p.hsCodeMerged || 0;
+    }
+  });
+
+  // ★ 保存覆盖数据到服务器，下次可复用
+  if (Object.keys(overrides).length > 0) {
+    try {
+      await api('POST', '/api/review-overrides', { overrides });
+    } catch (e) {
+      console.error('保存审查覆盖数据失败:', e);
+    }
+  }
+
+  closeManualReview();
+  const btn = document.getElementById('btnGenerate');
+  btn.disabled = true;
+  btn.textContent = '⏳ 正在生成...';
+
+  try {
+    const data = await api('POST', '/api/generate', {
+      confirmedLocations: STATE.confirmedLocations,
+      overrides: overrides,
+    });
+    window.open(data.downloadUrl, '_blank');
+    showToast('✅ 报关文件已生成并开始下载: ' + data.fileName, 'ok');
+    updateSteps(4);
+  } catch(e) {
+    showToast('生成失败: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⬇ 生成并下载报关文件';
+  }
 }
 
 function escapeHTML(str) {

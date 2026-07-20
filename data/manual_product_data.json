@@ -13,8 +13,55 @@
     "maxPrice": 11.45,
     "supplier": "",
     "city": "",
-    "netWeightPerUnit": 1,
     "description": "",
     "updatedAt": "2026-07-17T09:24:28.404Z"
+  },
+  "NY-41310P-01K": {
+    "sku": "NY-41310P-01K",
+    "maxPrice": 0,
+    "supplier": "",
+    "city": "����",
+    "description": "",
+    "updatedAt": "2026-07-20T03:15:47.163Z"
+  },
+  "NY-BJ153M-505K": {
+    "sku": "NY-BJ153M-505K",
+    "maxPrice": 0,
+    "supplier": "",
+    "city": "��ݸ",
+    "description": "",
+    "updatedAt": "2026-07-20T03:15:47.163Z"
+  },
+  "NY-150695-505K": {
+    "sku": "NY-150695-505K",
+    "maxPrice": 0,
+    "supplier": "",
+    "city": "��ݸ",
+    "description": "",
+    "updatedAt": "2026-07-20T03:15:47.163Z"
+  },
+  "NY-60Z152MK-03K": {
+    "sku": "NY-60Z152MK-03K",
+    "maxPrice": 0,
+    "supplier": "",
+    "city": "��ݸ",
+    "description": "",
+    "updatedAt": "2026-07-20T03:15:47.163Z"
+  },
+  "NY-BWM37507-12K": {
+    "sku": "NY-BWM37507-12K",
+    "maxPrice": 0,
+    "supplier": "",
+    "city": "��ݸ",
+    "description": "",
+    "updatedAt": "2026-07-20T03:15:47.163Z"
+  },
+  "NY-BJ152-505K": {
+    "sku": "NY-BJ152-505K",
+    "maxPrice": 0,
+    "supplier": "",
+    "city": "��ݸ",
+    "description": "",
+    "updatedAt": "2026-07-20T03:15:47.163Z"
   }
 }
