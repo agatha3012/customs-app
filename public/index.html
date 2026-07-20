@@ -643,13 +643,19 @@ function triggerUpload() {
   document.getElementById('fileInput').click();
 }
 
+// ★ 文档级拦截：阻止浏览器在任意位置拖放文件时打开/下载
+document.addEventListener('dragover', e => { e.preventDefault(); });
+document.addEventListener('drop', e => { e.preventDefault(); });
+
 ['dragenter','dragover'].forEach(e => {
-  uploadZone.addEventListener(e, ev => { ev.preventDefault(); if(!_uploading) uploadZone.classList.add('drag-over'); });
+  uploadZone.addEventListener(e, ev => { ev.preventDefault(); ev.stopPropagation(); if(!_uploading) uploadZone.classList.add('drag-over'); });
 });
 ['dragleave','drop'].forEach(e => {
-  uploadZone.addEventListener(e, ev => { ev.preventDefault(); uploadZone.classList.remove('drag-over'); });
+  uploadZone.addEventListener(e, ev => { ev.preventDefault(); ev.stopPropagation(); uploadZone.classList.remove('drag-over'); });
 });
 uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  e.stopPropagation();
   if (_uploading) return;
   const f = e.dataTransfer.files[0]; if (f) selectFile(f);
 });
