@@ -1067,7 +1067,7 @@ function validateConsistency(products, boxes) {
 }
 
 // ==================== 产品数据库查询 ====================
-app.post('/api/lookup-products', (req, res) => {
+app.post('/api/lookup-products', async (req, res) => {
   try {
     const { skus } = req.body;
     if (!skus || !Array.isArray(skus) || skus.length === 0) {
@@ -1116,6 +1116,41 @@ app.post('/api/lookup-products', (req, res) => {
       }
     });
     result.notFound = stillNotFound;
+
+    // ★ 自动从供应商名称推断城市（同步：缓存/内置映射/名称模式）
+    const uncertainItems = [];
+    Object.values(result.found).forEach(item => {
+      if ((!item.city || item.cityUncertain) && item.supplier && item.supplier.length >= 3) {
+        uncertainItems.push(item);
+      }
+    });
+
+    if (uncertainItems.length > 0) {
+      const suppliers = [...new Set(uncertainItems.map(it => it.supplier))];
+      console.log('[产品查询] 自动推断 ' + uncertainItems.length + ' 个不确定货源地, ' + suppliers.length + ' 个供应商');
+
+      // 逐个查询（优先缓存/内置映射，Web搜索设短超时）
+      const cityResults = {};
+      for (const supplier of suppliers) {
+        try {
+          const info = await supplierLookup.lookupSupplierCity(supplier);
+          if (info) cityResults[supplier] = info;
+        } catch (_) {}
+      }
+
+      // 将结果应用到产品
+      if (Object.keys(cityResults).length > 0) {
+        uncertainItems.forEach(item => {
+          const info = cityResults[item.supplier];
+          if (info) {
+            item.city = info.city;
+            item.cityUncertain = false;
+            item._citySource = info.source;
+          }
+        });
+        console.log('[产品查询] 自动推断结果: ' + Object.keys(cityResults).length + ' 个供应商→城市已填充');
+      }
+    }
 
     // 计算单价(USD) = 进价 × 常数 ÷ 汇率
     Object.values(result.found).forEach(item => {
@@ -1323,7 +1358,7 @@ app.post('/api/review-overrides', (req, res) => {
 });
 
 // ==================== 生成前数据核验 ====================
-app.post('/api/preflight-check', (req, res) => {
+app.post('/api/preflight-check', async (req, res) => {
   try {
     const { skus } = req.body;
     if (!skus || !Array.isArray(skus) || skus.length === 0) {
@@ -1350,6 +1385,28 @@ app.post('/api/preflight-check', (req, res) => {
         };
       }
     });
+
+    // ★ 自动从供应商名称推断城市（同步：缓存/内置映射/名称模式）
+    const fuzzyItems = [];
+    Object.values(lookupResult.found).forEach(item => {
+      if ((!item.city || item.cityUncertain) && item.supplier && item.supplier.length >= 3) {
+        fuzzyItems.push(item);
+      }
+    });
+    if (fuzzyItems.length > 0) {
+      const suppliers = [...new Set(fuzzyItems.map(it => it.supplier))];
+      for (const supplier of suppliers) {
+        try {
+          const info = await supplierLookup.lookupSupplierCity(supplier);
+          if (info) {
+            fuzzyItems.filter(it => it.supplier === supplier).forEach(it => {
+              it.city = info.city;
+              it.cityUncertain = false;
+            });
+          }
+        } catch (_) {}
+      }
+    }
 
     // 历史确认数据
     const confirmations = readConfirmations();
@@ -1552,7 +1609,7 @@ app.post('/api/preview-data', async (req, res) => {
       return res.status(400).json({ success: false, message: '发票数据为空' });
     }
 
-    const { genProducts, genBoxes } = computeGenData({
+    const { genProducts, genBoxes } = await computeGenData({
       invoiceProducts, invoiceBoxes, exchangeRate, constant, destination,
       confirmedLocations: req.body.confirmedLocations || {},
     });
@@ -1570,7 +1627,7 @@ app.post('/api/preview-data', async (req, res) => {
 });
 
 // ==================== 核心计算：发票数据 + 数据库 → 生成数据 ====================
-function computeGenData(params) {
+async function computeGenData(params) {
   const { invoiceProducts, invoiceBoxes, exchangeRate, constant, destination, confirmedLocations, overrides } = params;
 
   // 查询产品数据库获取进价
@@ -1604,6 +1661,30 @@ function computeGenData(params) {
     } else { stillNotFound.push(sku); }
   });
   lookupResult.notFound = stillNotFound;
+
+  // ★ 自动从供应商名称推断城市（同步：缓存/内置映射/名称模式）
+  const uncertainItems = [];
+  Object.values(lookupResult.found).forEach(item => {
+    if ((!item.city || item.cityUncertain) && item.supplier && item.supplier.length >= 3) {
+      uncertainItems.push(item);
+    }
+  });
+  if (uncertainItems.length > 0) {
+    const suppliers = [...new Set(uncertainItems.map(it => it.supplier))];
+    for (const supplier of suppliers) {
+      try {
+        const info = await supplierLookup.lookupSupplierCity(supplier);
+        if (info) {
+          uncertainItems.filter(it => it.supplier === supplier).forEach(it => {
+            it.city = info.city;
+            it.cityUncertain = false;
+            it._citySource = info.source;
+          });
+        }
+      } catch (_) {}
+    }
+    console.log('[computeGenData] 自动推断: ' + Object.keys(suppliers).length + ' 供应商 → 货源地');
+  }
 
   // 用户确认的数据
   const savedConfirmations = readConfirmations();
@@ -1767,7 +1848,7 @@ app.post('/api/generate', async (req, res) => {
     }
 
     // 使用统一计算函数
-    const { genProducts, genBoxes } = computeGenData({
+    const { genProducts, genBoxes } = await computeGenData({
       invoiceProducts, invoiceBoxes, exchangeRate, constant, destination,
       confirmedLocations: req.body.confirmedLocations || {},
       overrides: req.body.overrides || {},
