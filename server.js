@@ -6,6 +6,7 @@ const fs = require('fs');
 
 const productLookup = require('./lib/product-lookup');
 const templateGen = require('./lib/template-generator');
+const supplierLookup = require('./lib/supplier-lookup');
 
 const app = express();
 const PORT = 3000;
@@ -1134,6 +1135,29 @@ app.get('/api/manual-data', (req, res) => {
     res.json(readManualData());
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ==================== 供应商在线查询 ====================
+// POST: 根据供应商名称查询公司所在地（城市）
+app.post('/api/lookup-supplier-city', async (req, res) => {
+  try {
+    const { suppliers } = req.body;
+    if (!suppliers || !Array.isArray(suppliers) || suppliers.length === 0) {
+      return res.status(400).json({ success: false, message: '请提供供应商名称列表' });
+    }
+
+    // 过滤空值
+    const names = suppliers.filter(s => s && s.length >= 3);
+    if (names.length === 0) {
+      return res.json({ success: true, results: {}, notFound: suppliers, errors: [] });
+    }
+
+    const { results, notFound } = await supplierLookup.batchLookup(names);
+    console.log('[API] 供应商查询: 找到 ' + Object.keys(results).length + '/' + names.length);
+    res.json({ success: true, results, notFound });
+  } catch (err) {
+    res.status(500).json({ success: false, message: '查询失败: ' + err.message });
   }
 });
 

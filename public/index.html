@@ -109,6 +109,10 @@ input.error{border-color:var(--danger)!important;background:#fff5f5!important;bo
 .modal .city-row label{font-size:13px;font-weight:500;min-width:120px}
 .modal .city-row input{flex:1}
 .modal .city-row .supplier-name{font-size:12px;color:var(--text2)}
+.btn-lookup{background:#e3f2fd;color:#1565c0;border:1px solid #90caf9;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap;transition:all .2s}
+.btn-lookup:hover{background:#bbdefb}
+.btn-lookup:disabled{opacity:.6;cursor:not-allowed}
+.lookup-result{padding:4px 0}
 .modal .btn-row{margin-top:16px;display:flex;gap:8px;justify-content:flex-end}
 
 /* Toast */
@@ -921,16 +925,22 @@ function renderProductTable() {
 // ==================== 货源地弹窗 ====================
 function showLocationModal(uncertainItems) {
   const list = document.getElementById('locationList');
-  list.innerHTML = uncertainItems.map(item => `
+  list.innerHTML = uncertainItems.map(item => {
+    const supplier = item.rawSupplier || item.supplier || '';
+    return `
     <div class="city-row">
       <label>${item.sku}</label>
       <div style="flex:1">
-        <input type="text" class="location-input" data-sku="${item.sku}"
-               value="${item.city||''}" placeholder="请输入城市名">
-        <div class="supplier-name">供应商: ${item.rawSupplier||item.supplier||'未知'}</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" class="location-input" data-sku="${item.sku}"
+                 value="${item.city||''}" placeholder="请输入城市名" style="flex:1">
+          ${supplier ? `<button type="button" class="btn-lookup" onclick="lookupSupplierForInput(this, '${escapeHtml(supplier)}')" title="在线查询公司注册地">🔍 查询</button>` : ''}
+        </div>
+        <div class="supplier-name">供应商: ${supplier||'未知'}</div>
+        <div class="lookup-result" style="display:none;margin-top:4px;font-size:12px"></div>
       </div>
     </div>
-  `).join('');
+  `}).join('');
   document.getElementById('locationModal').classList.add('show');
 }
 
@@ -961,6 +971,88 @@ function confirmLocations() {
   renderProductTable();
   updateSteps(3);
   showToast('货源地已确认，可以生成文件', 'ok');
+}
+
+// ==================== 供应商在线查询 ====================
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function lookupSupplierForInput(btn, supplierName) {
+  const row = btn.closest('.city-row') || btn.parentElement.parentElement;
+  const resultDiv = row.querySelector('.lookup-result');
+  const input = row.querySelector('.location-input');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ 查询中...';
+  resultDiv.style.display = 'block';
+  resultDiv.style.color = '#666';
+  resultDiv.textContent = '正在查询 ' + supplierName + ' ...';
+
+  try {
+    const resp = await fetch('/api/lookup-supplier-city', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ suppliers: [supplierName] }),
+    });
+    const data = await resp.json();
+
+    if (data.success && data.results && data.results[supplierName]) {
+      const r = data.results[supplierName];
+      resultDiv.innerHTML = '🔍 查到注册地：<b style="color:#2e7d32">' + escapeHtml(r.city) + '</b> '
+        + ' <a href="#" onclick="applyLookupResult(this,\\'' + escapeHtml(r.city) + '\\');return false" style="color:#1976d2;font-weight:bold">[确认使用]</a>';
+    } else {
+      resultDiv.innerHTML = '⚠️ 未查到 <b>' + escapeHtml(supplierName) + '</b> 的注册地，请手动输入';
+      resultDiv.style.color = '#e65100';
+    }
+  } catch (err) {
+    resultDiv.textContent = '查询失败: ' + err.message;
+    resultDiv.style.color = '#c62828';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔍 查询';
+  }
+}
+
+function applyLookupResult(link, city) {
+  const row = link.closest('.city-row') || link.parentElement.parentElement;
+  const input = row.querySelector('.location-input');
+  const resultDiv = row.querySelector('.lookup-result');
+  input.value = city;
+  resultDiv.innerHTML = '✅ 已填入：<b>' + escapeHtml(city) + '</b>';
+  resultDiv.style.color = '#2e7d32';
+}
+
+/** 审查弹窗中查询供应商城市 */
+async function lookupSupplierForReviewInput(idx, supplierName) {
+  const input = document.getElementById('reviewInput' + idx);
+  const resultDiv = document.getElementById('reviewLookup' + idx);
+  if (!resultDiv) return;
+
+  resultDiv.style.display = 'block';
+  resultDiv.style.color = '#666';
+  resultDiv.textContent = '⏳ 正在查询...';
+
+  try {
+    const resp = await fetch('/api/lookup-supplier-city', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ suppliers: [supplierName] }),
+    });
+    const data = await resp.json();
+
+    if (data.success && data.results && data.results[supplierName]) {
+      const r = data.results[supplierName];
+      resultDiv.innerHTML = '🔍 查到注册地：<b style="color:#2e7d32">' + escapeHtml(r.city) + '</b>'
+        + ' <a href="#" onclick="document.getElementById(\\'reviewInput' + idx + '\\').value=\\'' + escapeHtml(r.city) + '\\';document.getElementById(\\'reviewLookup' + idx + '\\').innerHTML=\\'✅ 已填入：<b>' + escapeHtml(r.city) + '</b>\\';return false" style="color:#1976d2;font-weight:bold">[确认使用]</a>';
+    } else {
+      resultDiv.innerHTML = '⚠️ 未查到，请手动输入';
+      resultDiv.style.color = '#e65100';
+    }
+  } catch (err) {
+    resultDiv.textContent = '查询失败: ' + err.message;
+    resultDiv.style.color = '#c62828';
+  }
 }
 
 // ==================== 生成文件 ====================
@@ -1091,10 +1183,16 @@ function showReviewModal(items) {
       '<span class="review-field">⚠ ' + escapeHTML(fieldLabel) + '</span>' +
       (item.supplier ? '<span class="review-supplier">供应商: ' + escapeHTML(item.supplier) + '</span>' : '') +
       prevSection +
+      '<div style="display:flex;gap:6px;align-items:center">' +
       '<input class="review-input" id="reviewInput' + i + '" ' +
       'data-sku="' + escapeHTML(item.sku) + '" data-field="' + item.field + '" ' +
       'placeholder="' + (hasPrevData ? '点击「延用」或手动输入' : item.reason) + '" ' +
       'value="' + escapeHTML(item.currentValue || '') + '">' +
+      ((item.field === 'domesticSource' || item.field === 'all') && item.supplier
+        ? '<button type="button" class="btn-lookup" onclick="lookupSupplierForReviewInput(' + i + ',\'' + escapeHtml(item.supplier) + '\')" title="在线查询公司注册地">🔍</button>'
+        : '') +
+      '</div>' +
+      '<div class="lookup-result" id="reviewLookup' + i + '" style="display:none;font-size:12px"></div>' +
       '<div class="review-reason">' + escapeHTML(item.reason) + '</div>' +
       '</div>';
   }).join('');
