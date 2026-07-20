@@ -1006,7 +1006,7 @@ async function lookupSupplierForInput(btn, supplierName) {
     if (data.success && data.results && data.results[supplierName]) {
       const r = data.results[supplierName];
       resultDiv.innerHTML = '🔍 查到注册地：<b style="color:#2e7d32">' + escapeHtml(r.city) + '</b> '
-        + ' <a href="#" onclick="applyLookupResult(this,\\'' + escapeHtml(r.city) + '\\');return false" style="color:#1976d2;font-weight:bold">[确认使用]</a>';
+        + ' <a href="#" onclick="applyLookupResult(this,\'' + escapeHtml(r.city) + '\');return false" style="color:#1976d2;font-weight:bold">[确认使用]</a>';
     } else {
       resultDiv.innerHTML = '⚠️ 未查到 <b>' + escapeHtml(supplierName) + '</b> 的注册地，请手动输入';
       resultDiv.style.color = '#e65100';
@@ -1050,7 +1050,7 @@ async function lookupSupplierForReviewInput(idx, supplierName) {
     if (data.success && data.results && data.results[supplierName]) {
       const r = data.results[supplierName];
       resultDiv.innerHTML = '🔍 查到注册地：<b style="color:#2e7d32">' + escapeHtml(r.city) + '</b>'
-        + ' <a href="#" onclick="document.getElementById(\\'reviewInput' + idx + '\\').value=\\'' + escapeHtml(r.city) + '\\';document.getElementById(\\'reviewLookup' + idx + '\\').innerHTML=\\'✅ 已填入：<b>' + escapeHtml(r.city) + '</b>\\';return false" style="color:#1976d2;font-weight:bold">[确认使用]</a>';
+        + ' <a href="#" onclick="document.getElementById(\'reviewInput' + idx + '\').value=\'' + escapeHtml(r.city) + '\';document.getElementById(\'reviewLookup' + idx + '\').innerHTML=\'✅ 已填入：<b>' + escapeHtml(r.city) + '</b>\';return false" style="color:#1976d2;font-weight:bold">[确认使用]</a>';
     } else {
       resultDiv.innerHTML = '⚠️ 未查到，请手动输入';
       resultDiv.style.color = '#e65100';
